@@ -79,4 +79,5 @@
 - ResNet p1–2：success，22 段，0 error，变异检出 0.97；Transformer p1–2：success，19 段，0 error，1.0；toy 5/5；zh→en success；4 个异常用例状态如实；两次运行段号哈希一致。
 - 术语回填、段号唯一、bilingual.md/html、translation.zh.md、alignment.jsonl 均已检查。
 - `literature-translator_arm_v0.3.0.zip`：zip 中每个文件的哈希都与开发目录一致。Skill 共 17 个文件（≤50），最大的是 pdf_layout.py，约 113 KB（≤500 KB），合计约 352 KB（≤2 MB），全部 UTF‑8，没有符号链接。旧包 v0.1.0（e223d643…）、v0.2.0（b5e8bd12…）以及 grading/ 均保留未改。
-- GitHub 仍未发布（GITHUB_URL.txt 为 NOT_YET_PUBLISHED），需要先登录 GitHub。
+- 开源仓库：https://github.com/chensuyan407-prog/literature-translator （MIT；Skill 在根目录，复现与回归脚本在 dev/；不含论文 PDF、转录和整篇译文）。已写入 GITHUB_URL.txt。
+- 平台提交：attempt 99244（Skill 目录 + 本会话原生 trace）。
