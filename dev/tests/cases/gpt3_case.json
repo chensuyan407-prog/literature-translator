@@ -1,0 +1,15 @@
+{
+ "case_id": "gpt3",
+ "materials": [
+  "paper.pdf"
+ ],
+ "target_language": "zh",
+ "output_contract": {
+  "case_id": "string",
+  "status": "string",
+  "status_reason": "string",
+  "aligned_passages": "list",
+  "terminology": "list",
+  "verification_notes": "list"
+ }
+}

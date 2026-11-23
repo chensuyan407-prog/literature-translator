@@ -1,0 +1,5 @@
+residual connection => 残差连接 ! 残余连接|剩余连接
+layer normalization => 层归一化 ! 层标准化
+sub-layer => 子层
+training loss => 训练损失
+epoch => 轮 ! 时期|纪元

@@ -1,0 +1,5 @@
+PyMuPDF>=1.23
+# tested: PyMuPDF 1.28.2 and 2.1 (2.x pulls pymupdf_layout; its layout model is switched off in pdf_layout.py, results identical)
+numpy>=1.22
+# numpy: layout regions of scanned pages (without it each page is one region; see SKILL.md)
+# optional: openpyxl (xlsx glossaries); system: tesseract-ocr + chi_sim (OCR of scanned pages), poppler-utils (pdftotext fallback)

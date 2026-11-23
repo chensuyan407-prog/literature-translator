@@ -1,0 +1,931 @@
+{
+ "skill": "literature-translator",
+ "version": "0.3.0",
+ "ran_at": "2026-11-23T00:12:14.647134Z",
+ "toy_example": {
+  "injected_error_codes_expected": [
+   "term_violation",
+   "negation_lost",
+   "crossref_mismatch",
+   "qualifier_check",
+   "number_missing"
+  ],
+  "detected": [
+   "term_violation",
+   "negation_lost",
+   "crossref_mismatch",
+   "qualifier_check",
+   "number_missing"
+  ],
+  "final_status": "success"
+ },
+ "case_example": {
+  "status": "success",
+  "contract_fields_unfilled": [],
+  "coverage": 1.0,
+  "translated_segments": 22,
+  "untranslated_segments": 0,
+  "term_consistency_locked": 1.0,
+  "term_occurrences_locked": 55,
+  "placeholder_integrity": 1.0,
+  "number_preservation": 1.0,
+  "crossref_preservation": 1.0,
+  "errors": 0,
+  "warnings": 1,
+  "mutation_detection_rate": 0.97,
+  "mutations_applied": 169,
+  "mutations_detected": 164,
+  "mutation_by_type": {
+   "term_swap": 1.0,
+   "untranslated": 1.0,
+   "empty": 1.0,
+   "duplicate": 0.952,
+   "number_change": 1.0,
+   "number_drop": 1.0,
+   "placeholder_drop": 1.0,
+   "placeholder_dup": 1.0,
+   "omission": 1.0,
+   "noun_swap": 0.0,
+   "qualifier_flip": 1.0,
+   "crossref_change": 1.0,
+   "crossref_kind": 1.0,
+   "negation_drop": 1.0,
+   "negation_one": 0.667
+  },
+  "clean_false_alarm_rate_error": 0.0,
+  "baseline_compare": {
+   "pdf": "paper.pdf",
+   "pages": "1-2",
+   "baseline_extractor": "pdftotext",
+   "baseline": {
+    "chunks": 37,
+    "broken_sentence_boundaries": 8,
+    "noise_lines_in_text": 11,
+    "captions_glued_to_body": 0,
+    "hyphen_line_breaks": 0,
+    "formula_fragment_lines": 2
+   },
+   "skill": {
+    "segments": 24,
+    "translatable_segments": 22,
+    "cross_column_or_page_joins": 4,
+    "layout_noise_removed_and_logged": 22,
+    "captions_as_own_segments": 2,
+    "formula_placeholders": 4,
+    "citation_placeholders": 39,
+    "display_equations_kept_verbatim": 0
+   },
+   "note": "baseline = plain text split on blank lines, i.e. what an agent without the Skill typically translates chunk by chunk"
+  }
+ },
+ "heldout_attention": {
+  "status": "success",
+  "contract_fields_unfilled": [],
+  "coverage": 1.0,
+  "translated_segments": 19,
+  "untranslated_segments": 0,
+  "term_consistency_locked": 1.0,
+  "term_occurrences_locked": 31,
+  "placeholder_integrity": 1.0,
+  "number_preservation": 1.0,
+  "crossref_preservation": 1.0,
+  "errors": 0,
+  "warnings": 0,
+  "mutation_detection_rate": 1.0,
+  "mutations_applied": 113,
+  "mutations_detected": 113,
+  "mutation_by_type": {
+   "untranslated": 1.0,
+   "empty": 1.0,
+   "qualifier_flip": 1.0,
+   "duplicate": 1.0,
+   "number_change": 1.0,
+   "number_drop": 1.0,
+   "term_swap": 1.0,
+   "omission": 1.0,
+   "noun_swap": 1.0,
+   "placeholder_drop": 1.0,
+   "placeholder_dup": 1.0,
+   "negation_drop": 1.0
+  },
+  "clean_false_alarm_rate_error": 0.0,
+  "baseline_compare": {
+   "pdf": "paper.pdf",
+   "pages": "1-2",
+   "baseline_extractor": "pdftotext",
+   "baseline": {
+    "chunks": 12,
+    "broken_sentence_boundaries": 1,
+    "noise_lines_in_text": 1,
+    "captions_glued_to_body": 0,
+    "hyphen_line_breaks": 0,
+    "formula_fragment_lines": 0
+   },
+   "skill": {
+    "segments": 21,
+    "translatable_segments": 19,
+    "cross_column_or_page_joins": 1,
+    "layout_noise_removed_and_logged": 2,
+    "captions_as_own_segments": 0,
+    "formula_placeholders": 7,
+    "citation_placeholders": 21,
+    "display_equations_kept_verbatim": 0
+   },
+   "note": "baseline = plain text split on blank lines, i.e. what an agent without the Skill typically translates chunk by chunk"
+  }
+ },
+ "zh_en_sample": {
+  "direction": {
+   "source_lang": "zh",
+   "target_lang": "en"
+  },
+  "status": "success",
+  "coverage": 1.0,
+  "errors": 0
+ },
+ "exceptions": {
+  "encrypted": {
+   "exit_code": 2,
+   "status": "failed",
+   "status_reason": "encrypted: PDF is password protected; pass --password or ask a human for the password",
+   "segments": 0,
+   "uncertainty": [
+    "automatic checks verify numbers, units, placeholders (formulas/citations/URLs), cross-references, glossary terms, negation and qualifier cues; they do not prove semantic adequacy — warnings are listed in manual_review.md"
+   ]
+  },
+  "scanned_no_ocr": {
+   "exit_code": 0,
+   "status": "partial",
+   "status_reason": "no segment translated yet; 35 scanned region(s) await transcription (no text layer, no OCR)",
+   "segments": 35,
+   "uncertainty": [
+    "parser warning p.1: ocr_needed_but_unavailable no text layer (scanned); tesseract executable not found on PATH. Text for this page is missing or unreliable. Page image and layout regions are provided for visual reading.",
+    "automatic checks verify numbers, units, placeholders (formulas/citations/URLs), cross-references, glossary terms, negation and qualifier cues; they do not prove semantic adequacy — warnings are listed in manual_review.md"
+   ]
+  },
+  "no_pymupdf_fallback": {
+   "exit_code": 0,
+   "status": "partial",
+   "status_reason": "no segment translated yet",
+   "segments": 16,
+   "uncertainty": [
+    "parser warning p.-: fallback_extractor PyMuPDF unavailable: no bboxes, no math-font protection, simpler layout rules",
+    "automatic checks verify numbers, units, placeholders (formulas/citations/URLs), cross-references, glossary terms, negation and qualifier cues; they do not prove semantic adequacy — warnings are listed in manual_review.md"
+   ]
+  },
+  "missing_source": {
+   "exit_code": 2,
+   "status": "failed",
+   "status_reason": "no source document found (case=None); pass --source FILE",
+   "segments": 0,
+   "uncertainty": [
+    "automatic checks verify numbers, units, placeholders (formulas/citations/URLs), cross-references, glossary terms, negation and qualifier cues; they do not prove semantic adequacy — warnings are listed in manual_review.md"
+   ]
+  }
+ },
+ "v0.3": {
+  "glove": {
+   "table1_data_cells": "12/12",
+   "table1_header_in_table": true,
+   "joins": {
+    "p2_S0021_inline_sum_and_p3_join": true,
+    "p5_S0059_S0061_inline_definition_one_segment": true,
+    "p5_S0066_S0076_cross_column_order": true,
+    "p5_S0075_no_other_column_in_equation": true
+   },
+   "leaked_table_header": [],
+   "equations_pass": "22/22",
+   "equations_rebuilt_exactly": 18,
+   "needs_confirmation": [
+    "9",
+    "15",
+    "20",
+    "22"
+   ]
+  },
+  "checker_validation_glove": {
+   "detected": 14,
+   "total": 14,
+   "clean_segments": 7,
+   "clean_with_error": 0,
+   "clean_with_warn": 0
+  },
+  "checker_validation_v2": {
+   "detected": 16,
+   "total": 16,
+   "clean_segments": 10,
+   "clean_with_error": 0,
+   "clean_with_warn": 0,
+   "rows": {
+    "number": {
+     "hit": true,
+     "errors": [
+      "number_missing"
+     ],
+     "warnings": [
+      "number_added"
+     ]
+    },
+    "unit": {
+     "hit": true,
+     "errors": [
+      "unit_changed"
+     ],
+     "warnings": []
+    },
+    "crossref": {
+     "hit": true,
+     "errors": [
+      "crossref_kind_mismatch",
+      "crossref_mismatch",
+      "number_missing"
+     ],
+     "warnings": [
+      "number_added"
+     ]
+    },
+    "crossref_kind": {
+     "hit": true,
+     "errors": [
+      "crossref_kind_mismatch",
+      "crossref_mismatch"
+     ],
+     "warnings": []
+    },
+    "math_drop": {
+     "hit": true,
+     "errors": [
+      "placeholder_missing"
+     ],
+     "warnings": []
+    },
+    "math_dup": {
+     "hit": true,
+     "errors": [
+      "placeholder_extra"
+     ],
+     "warnings": []
+    },
+    "cite_drop": {
+     "hit": true,
+     "errors": [
+      "placeholder_missing"
+     ],
+     "warnings": []
+    },
+    "cite_dup": {
+     "hit": true,
+     "errors": [
+      "placeholder_extra"
+     ],
+     "warnings": []
+    },
+    "negation": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "negation_count"
+     ]
+    },
+    "negation_scope": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "negation_scope"
+     ]
+    },
+    "qualifier": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "qualifier_check"
+     ]
+    },
+    "term": {
+     "hit": true,
+     "errors": [
+      "term_violation"
+     ],
+     "warnings": []
+    },
+    "half": {
+     "hit": true,
+     "errors": [
+      "placeholder_missing"
+     ],
+     "warnings": [
+      "length_ratio",
+      "negation_scope",
+      "number_count"
+     ]
+    },
+    "swapped": {
+     "hit": true,
+     "errors": [
+      "number_missing",
+      "placeholder_extra",
+      "placeholder_missing"
+     ],
+     "warnings": [
+      "number_added"
+     ]
+    },
+    "semantic": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "subject_binding"
+     ]
+    },
+    "semantic_cells": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "subject_binding"
+     ]
+    }
+   }
+  },
+  "heldout_attention_mutations": {
+   "detected": 17,
+   "total": 22,
+   "detected_as_error": 13,
+   "clean_segments": 20,
+   "clean_with_error": 0,
+   "clean_with_warn": 0,
+   "rows": {
+    "number": {
+     "hit": true,
+     "errors": [
+      "number_missing"
+     ],
+     "warnings": [
+      "number_added"
+     ]
+    },
+    "number_table": {
+     "hit": true,
+     "errors": [
+      "number_missing",
+      "table_cell_mismatch"
+     ],
+     "warnings": [
+      "number_added"
+     ]
+    },
+    "unit": {
+     "hit": false,
+     "errors": [],
+     "warnings": []
+    },
+    "unit_time": {
+     "hit": false,
+     "errors": [],
+     "warnings": []
+    },
+    "crossref": {
+     "hit": true,
+     "errors": [
+      "crossref_kind_mismatch",
+      "crossref_mismatch",
+      "number_missing"
+     ],
+     "warnings": [
+      "number_added"
+     ]
+    },
+    "crossref_kind": {
+     "hit": true,
+     "errors": [
+      "crossref_kind_mismatch",
+      "crossref_mismatch"
+     ],
+     "warnings": []
+    },
+    "crossref_section": {
+     "hit": true,
+     "errors": [
+      "crossref_kind_mismatch",
+      "crossref_mismatch"
+     ],
+     "warnings": []
+    },
+    "math_drop": {
+     "hit": true,
+     "errors": [
+      "placeholder_missing"
+     ],
+     "warnings": []
+    },
+    "math_dup": {
+     "hit": true,
+     "errors": [
+      "placeholder_extra"
+     ],
+     "warnings": []
+    },
+    "cite_drop": {
+     "hit": true,
+     "errors": [
+      "placeholder_missing"
+     ],
+     "warnings": []
+    },
+    "cite_dup": {
+     "hit": true,
+     "errors": [
+      "placeholder_extra"
+     ],
+     "warnings": []
+    },
+    "negation": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "negation_lost"
+     ]
+    },
+    "negation_scope": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "negation_scope"
+     ]
+    },
+    "negation_scope2": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "negation_scope"
+     ]
+    },
+    "qualifier": {
+     "hit": false,
+     "errors": [],
+     "warnings": []
+    },
+    "qualifier2": {
+     "hit": true,
+     "errors": [],
+     "warnings": [
+      "qualifier_check"
+     ]
+    },
+    "term": {
+     "hit": true,
+     "errors": [
+      "term_violation"
+     ],
+     "warnings": []
+    },
+    "half": {
+     "hit": true,
+     "errors": [
+      "number_missing",
+      "placeholder_missing"
+     ],
+     "warnings": [
+      "length_ratio"
+     ]
+    },
+    "swapped": {
+     "hit": true,
+     "errors": [
+      "crossref_kind_mismatch",
+      "crossref_mismatch",
+      "number_missing",
+      "placeholder_extra",
+      "placeholder_missing"
+     ],
+     "warnings": [
+      "number_added",
+      "sentence_count"
+     ]
+    },
+    "semantic": {
+     "hit": false,
+     "errors": [],
+     "warnings": []
+    },
+    "semantic_cells": {
+     "hit": true,
+     "errors": [
+      "table_cell_mismatch"
+     ],
+     "warnings": []
+    },
+    "semantic_binding": {
+     "hit": false,
+     "errors": [],
+     "warnings": []
+    }
+   }
+  },
+  "heldout_gpt3_clean": {
+   "clean_segments": 12,
+   "with_error": 0,
+   "with_warning": 0
+  },
+  "heldout_bert_clean": {
+   "clean_segments": 21,
+   "with_error": 0,
+   "with_warning": 0
+  },
+  "heldout_attention_clean": {
+   "clean_segments": 20,
+   "with_error": 0,
+   "with_warning": 0
+  },
+  "enforce_backfill": {
+   "error_before": true,
+   "enforce_output": "enforce: 1 segment(s) rewritten; locked-term consistency now 1.0; remaining term errors 0 (need manual rewording: `tr.py issues`, then `put`).",
+   "variant_left": false,
+   "revision": 3,
+   "logged": true
+  },
+  "scan_bert_numpy": {
+   "status": "partial",
+   "status_reason": "0 of 77 in-scope segments untranslated; 63 scanned region(s) not transcribed; scanned pages fully transcribed 1/3",
+   "errors": 0,
+   "warnings": 0,
+   "facts_found": "7/7",
+   "facts_in_translation": {
+    "79.6": true,
+    "82.1": true,
+    "80.5": true,
+    "72.8": true,
+    "392k": true,
+    "MNLI-(m/mm)": true,
+    "平均": true
+   },
+   "scan_after": {
+    "pages_in_scope": 3,
+    "pages_transcribed": [
+     6
+    ],
+    "pages_partially_transcribed": [],
+    "pages_not_started": [
+     5,
+     12
+    ],
+    "regions_total": 80,
+    "regions_pending": 63,
+    "regions_unreadable": 0,
+    "region_granularity": [
+     "region"
+    ],
+    "transcribed_segments": 14,
+    "transcribed_segments_to_translate": 14,
+    "transcribed_segments_translated": 14,
+    "degraded": []
+   },
+   "children_with_own_bbox": 14,
+   "degraded_reason_in_result": false,
+   "pending_in_scope": [
+    "S0070",
+    "S0071",
+    "S0072",
+    "S0073",
+    "S0074",
+    "S0075",
+    "S0076",
+    "S0077",
+    "S0078",
+    "S0079",
+    "S0080",
+    "S0081",
+    "S0082",
+    "S0083",
+    "S0084",
+    "S0085",
+    "S0086",
+    "S0087",
+    "S0088",
+    "S0089",
+    "S0090",
+    "S0091",
+    "S0092",
+    "S0093",
+    "S0094",
+    "S0095",
+    "S0096",
+    "S0097",
+    "S0098",
+    "S0099",
+    "S0100",
+    "S0235",
+    "S0236",
+    "S0237",
+    "S0238",
+    "S0239",
+    "S0240",
+    "S0241",
+    "S0242",
+    "S0243",
+    "S0244",
+    "S0245",
+    "S0246",
+    "S0247",
+    "S0248",
+    "S0249",
+    "S0250",
+    "S0251",
+    "S0252",
+    "S0253",
+    "S0254",
+    "S0255",
+    "S0256",
+    "S0257",
+    "S0258",
+    "S0259",
+    "S0260",
+    "S0261",
+    "S0262",
+    "S0263",
+    "S0264",
+    "S0265",
+    "S0266"
+   ]
+  },
+  "scan_bert_no_numpy": {
+   "status": "partial",
+   "status_reason": "0 of 16 in-scope segments untranslated; 2 scanned region(s) not transcribed; scanned pages fully transcribed 1/3",
+   "errors": 0,
+   "warnings": 0,
+   "facts_found": "7/7",
+   "facts_in_translation": {
+    "79.6": true,
+    "82.1": true,
+    "80.5": true,
+    "72.8": true,
+    "392k": true,
+    "MNLI-(m/mm)": true,
+    "平均": true
+   },
+   "scan_after": {
+    "pages_in_scope": 3,
+    "pages_transcribed": [
+     6
+    ],
+    "pages_partially_transcribed": [],
+    "pages_not_started": [
+     5,
+     12
+    ],
+    "regions_total": 3,
+    "regions_pending": 2,
+    "regions_unreadable": 0,
+    "region_granularity": [
+     "page"
+    ],
+    "transcribed_segments": 14,
+    "transcribed_segments_to_translate": 14,
+    "transcribed_segments_translated": 14,
+    "degraded": [
+     "numpy is not installed: layout regions cannot be computed, the whole page is one region (install numpy, or transcribe with page + box locators so each part keeps its own bbox)"
+    ]
+   },
+   "children_with_own_bbox": 14,
+   "degraded_reason_in_result": true,
+   "pending_in_scope": [
+    "S0005",
+    "S0012"
+   ]
+  },
+  "scan_hubble_numpy": {
+   "status": "success",
+   "status_reason": "all in-scope segments translated; no hard-check errors (warnings may remain)",
+   "errors": 0,
+   "warnings": 0,
+   "facts_found": "7/7",
+   "facts_in_translation": {
+    "+465 ± 50": true,
+    "+513 ± 60": true,
+    "306 km/s": true,
+    "247 km/s": true,
+    "10^{6}": true,
+    "24 个天体": true,
+    "9 组": true
+   },
+   "scan_after": {
+    "pages_in_scope": 1,
+    "pages_transcribed": [
+     3
+    ],
+    "pages_partially_transcribed": [],
+    "pages_not_started": [],
+    "regions_total": 13,
+    "regions_pending": 0,
+    "regions_unreadable": 0,
+    "region_granularity": [
+     "region"
+    ],
+    "transcribed_segments": 6,
+    "transcribed_segments_to_translate": 5,
+    "transcribed_segments_translated": 5,
+    "degraded": []
+   },
+   "children_with_own_bbox": 6,
+   "degraded_reason_in_result": false,
+   "pending_in_scope": []
+  },
+  "scan_hubble_no_numpy": {
+   "status": "success",
+   "status_reason": "all in-scope segments translated; no hard-check errors (warnings may remain)",
+   "errors": 0,
+   "warnings": 0,
+   "facts_found": "7/7",
+   "facts_in_translation": {
+    "+465 ± 50": true,
+    "+513 ± 60": true,
+    "306 km/s": true,
+    "247 km/s": true,
+    "10^{6}": true,
+    "24 个天体": true,
+    "9 组": true
+   },
+   "scan_after": {
+    "pages_in_scope": 1,
+    "pages_transcribed": [
+     3
+    ],
+    "pages_partially_transcribed": [],
+    "pages_not_started": [],
+    "regions_total": 1,
+    "regions_pending": 0,
+    "regions_unreadable": 0,
+    "region_granularity": [
+     "page"
+    ],
+    "transcribed_segments": 6,
+    "transcribed_segments_to_translate": 5,
+    "transcribed_segments_translated": 5,
+    "degraded": [
+     "numpy is not installed: layout regions cannot be computed, the whole page is one region (install numpy, or transcribe with page + box locators so each part keeps its own bbox)"
+    ]
+   },
+   "children_with_own_bbox": 6,
+   "degraded_reason_in_result": true,
+   "pending_in_scope": []
+  },
+  "contract": {
+   "all_typed_or_reported": true,
+   "silent_type_violations": [],
+   "contract_gaps": [
+    {
+     "field": "confidence_level",
+     "expected": "number",
+     "got": "unavailable",
+     "reason": "value of type str cannot be converted to number; field set to null"
+    }
+   ],
+   "contract_type_coercions": [
+    {
+     "field": "qa_checks",
+     "declared": "list",
+     "from": "dict",
+     "to": "list"
+    },
+    {
+     "field": "glossary_table",
+     "declared": "object",
+     "from": "list",
+     "to": "dict"
+    },
+    {
+     "field": "is_complete",
+     "declared": "boolean",
+     "from": "str",
+     "to": "bool"
+    },
+    {
+     "field": "reviewer_comment",
+     "declared": "string",
+     "from": "list",
+     "to": "str"
+    }
+   ]
+  },
+  "gpt3_real_run": {
+   "recorded_finalize_elapsed_s": 723.3,
+   "budget_s": 900,
+   "puts": 20,
+   "recorded_status": "partial",
+   "translator": "Claude Opus 5.5 (the developing agent) - NOT the platform's DeepSeek harness; model requests of the harness: 未测 (not observable here)",
+   "replay_status": "partial",
+   "replay_translated": 373,
+   "in_scope": 561,
+   "replay_coverage_by_kind": {
+    "headings": {
+     "segments_done": 53,
+     "segments_total": 53,
+     "units_done": 161,
+     "units_total": 161,
+     "segment_coverage": 1.0,
+     "unit_coverage": 1.0
+    },
+    "body": {
+     "segments_done": 258,
+     "segments_total": 375,
+     "units_done": 19957,
+     "units_total": 25401,
+     "segment_coverage": 0.688,
+     "unit_coverage": 0.7857
+    },
+    "captions": {
+     "segments_done": 43,
+     "segments_total": 109,
+     "units_done": 2417,
+     "units_total": 3264,
+     "segment_coverage": 0.3945,
+     "unit_coverage": 0.7405
+    },
+    "tables": {
+     "segments_done": 19,
+     "segments_total": 24,
+     "units_done": 570,
+     "units_total": 693,
+     "segment_coverage": 0.7917,
+     "unit_coverage": 0.8225
+    }
+   },
+   "source_words_by_kind": {
+    "title": {
+     "segments_done": 1,
+     "segments_total": 1,
+     "words_done": 5,
+     "words_total": 5
+    },
+    "heading": {
+     "segments_done": 52,
+     "segments_total": 52,
+     "words_done": 215,
+     "words_total": 215
+    },
+    "paragraph": {
+     "segments_done": 251,
+     "segments_total": 368,
+     "words_done": 21042,
+     "words_total": 26661
+    },
+    "footnote": {
+     "segments_done": 7,
+     "segments_total": 7,
+     "words_done": 231,
+     "words_total": 231
+    },
+    "caption": {
+     "segments_done": 43,
+     "segments_total": 109,
+     "words_done": 2647,
+     "words_total": 3590
+    },
+    "table": {
+     "segments_done": 19,
+     "segments_total": 24,
+     "words_done": 1250,
+     "words_total": 1480
+    }
+   },
+   "replay_errors": 1,
+   "replay_warnings": 48,
+   "error_segments": [
+    "S0074"
+   ],
+   "untranslated_listed": 188,
+   "resume_command": "python tr.py --work <output>/resume_state session --budget 900 && python tr.py --work <output>/resume_state batch",
+   "resume": {
+    "translations_before": 373,
+    "translations_after": 380,
+    "earlier_unchanged": 373,
+    "change_log_entries": 387,
+    "session_logged": true,
+    "status_after": "partial",
+    "translated_after": 380
+   },
+   "baseline_v0.2_B1": {
+    "source": "grading/v0.2.0/GRADE_REPORT.md row gpt3/B/1",
+    "elapsed_s": 779.1,
+    "translated": "114/563",
+    "headings": "53 (all)",
+    "errors": 0,
+    "warnings": 13,
+    "translator": "grading agent"
+   },
+   "caveat": "v0.2 and v0.3 runs used different translating agents; the difference in translated segments is dominated by translator throughput, not by Skill changes (the scheduler logic is unchanged from v0.2 apart from the resume fix)."
+  },
+  "gpt3_longdoc_sim": {
+   "emulated_seconds_at_finalize": 802,
+   "budget": 900,
+   "status": "partial",
+   "coverage": 0.1943,
+   "verification_notes_type": "list"
+  }
+ },
+ "determinism": {
+  "segments_sha256_run1": "9071b4b873f0f23ba022094922342d1028d8fe3659f0ded743e05f5d25e8ecf3",
+  "segments_sha256_run2": "9071b4b873f0f23ba022094922342d1028d8fe3659f0ded743e05f5d25e8ecf3",
+  "identical": true
+ },
+ "wall_time_s": 71.41
+}

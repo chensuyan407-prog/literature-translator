@@ -1,0 +1,182 @@
+# literature-translator base glossary (EN -> ZH), v0.1.0. Columns: source<TAB>target<TAB>forbidden variants (|-separated)<TAB>note
+# Only cross-disciplinary terms with ONE standard Chinese rendering (GB/T, 全国科学技术名词审定委员会 usage) are listed.
+# Auto-applied when the term occurs in the paper; violations are reported as WARN (not error).
+# A paper-specific glossary (case file or `tr.py glossary`) always overrides an entry here.
+# Maintain: add a line, keep it unambiguous across fields; ambiguous words (kernel, field, model, network, order) are deliberately absent.
+ablation study	消融实验	消融研究|切除研究
+ablation experiment	消融实验	消融研究
+state of the art	当前最优	最先进技术
+state-of-the-art	当前最优	最先进技术
+ground truth	真值	地面真相|基本事实
+baseline	基线	底线
+benchmark	基准	标杆
+hyperparameter	超参数	超级参数
+learning rate	学习率	学习速率
+batch size	批量大小	批次尺寸
+mini-batch	小批量	迷你批
+stochastic gradient descent	随机梯度下降	随机梯度下滑
+gradient descent	梯度下降	梯度下滑
+backpropagation	反向传播	后向传播
+loss function	损失函数	丢失函数
+objective function	目标函数	客观函数
+cross-entropy	交叉熵	交叉墒
+overfitting	过拟合	过度拟合|过适配
+underfitting	欠拟合	拟合不足
+regularization	正则化	规则化|规范化
+weight decay	权重衰减	权值衰减
+batch normalization	批量归一化	批标准化|批规范化
+layer normalization	层归一化	层标准化
+activation function	激活函数	激励函数
+convolutional neural network	卷积神经网络	卷积神经元网络
+recurrent neural network	循环神经网络	递归神经网络
+neural network	神经网络	神经元网络
+deep learning	深度学习	深层学习
+machine learning	机器学习	机械学习
+reinforcement learning	强化学习	增强学习
+supervised learning	监督学习	有监督式学习
+unsupervised learning	无监督学习	非监督学习
+self-supervised learning	自监督学习	自我监督学习
+transfer learning	迁移学习	转移学习
+fine-tuning	微调	精调
+pre-training	预训练	预先训练
+pretraining	预训练	预先训练
+feature map	特征图	特征映射图
+receptive field	感受野	接受野|感受域
+pooling	池化	汇集|汇聚
+max pooling	最大池化	最大汇聚
+attention mechanism	注意力机制	关注机制
+self-attention	自注意力	自我注意力
+encoder	编码器	编码机
+decoder	解码器	译码器
+embedding	嵌入	内嵌
+tokenizer	分词器	标记器
+training set	训练集	训练组
+test set	测试集	测验集
+validation set	验证集	确认集
+data augmentation	数据增强	数据扩充|数据增广
+object detection	目标检测	物体侦测|对象检测
+semantic segmentation	语义分割	语义切分
+image recognition	图像识别	影像辨识
+top-1 error	top-1 错误率	第一错误率
+error rate	错误率	误差率
+convergence	收敛	汇聚
+robustness	鲁棒性	稳健性|健壮性
+generalization	泛化	一般化
+scalability	可扩展性	可伸缩性
+throughput	吞吐量	通过量
+latency	延迟	潜伏期
+vanishing gradient	梯度消失	消失梯度
+exploding gradient	梯度爆炸	爆炸梯度
+identity mapping	恒等映射	同一映射|身份映射
+linear projection	线性投影	线性投射
+nonlinearity	非线性	不线性
+matrix	矩阵	矩陣
+tensor	张量	张力
+eigenvalue	特征值	本征值
+eigenvector	特征向量	本征向量
+covariance	协方差	共变异数
+variance	方差	变异数
+standard deviation	标准差	标准偏差
+confidence interval	置信区间	信赖区间
+hypothesis test	假设检验	假说检定
+null hypothesis	零假设	虚无假设
+p-value	p 值	p-价值
+statistically significant	具有统计学显著性	统计显著的
+correlation coefficient	相关系数	关联系数
+probability distribution	概率分布	机率分布
+Gaussian distribution	高斯分布	常态分布
+normal distribution	正态分布	常态分布
+Monte Carlo	蒙特卡罗	蒙地卡罗
+Markov chain	马尔可夫链	马可夫链
+Bayesian	贝叶斯	贝氏
+maximum likelihood	最大似然	最大可能性
+optimization	优化	最适化
+optimizer	优化器	最佳化器
+algorithm	算法	演算法
+upper bound	上界	上限值
+lower bound	下界	下限值
+theorem	定理	原理
+lemma	引理	辅助定理
+corollary	推论	系论
+boundary condition	边界条件	边值条件
+initial condition	初始条件	起始条件
+differential equation	微分方程	差分方程
+partial differential equation	偏微分方程	部分微分方程
+finite element method	有限元法	有限元素法
+numerical simulation	数值模拟	数字模拟
+molecular dynamics	分子动力学	分子动态
+density functional theory	密度泛函理论	密度函数理论
+first-principles	第一性原理	第一原理
+band gap	带隙	能隙|禁带宽度
+Fermi level	费米能级	费米能阶
+photon	光子	光量子
+phonon	声子	音子
+quantum dot	量子点	量子小点
+thin film	薄膜	细膜
+lattice constant	晶格常数	晶格常量
+crystal structure	晶体结构	结晶结构
+X-ray diffraction	X 射线衍射	X 光绕射
+scanning electron microscopy	扫描电子显微镜	扫描式电子显微镜
+transmission electron microscopy	透射电子显微镜	穿透式电子显微镜
+spectroscopy	光谱学	频谱学
+absorption spectrum	吸收光谱	吸收频谱
+wavelength	波长	波段
+phase transition	相变	相转变
+thermal conductivity	热导率	导热系数
+specific heat	比热	比热容量
+superconductivity	超导	超导性
+magnetic field	磁场	磁域
+electric field	电场	电域
+redshift	红移	红位移
+dark matter	暗物质	黑暗物质
+dark energy	暗能量	黑暗能量
+Hubble constant	哈勃常数	哈伯常数
+galaxy	星系	银河
+catalyst	催化剂	触媒
+catalysis	催化	触媒作用
+reaction rate	反应速率	反应率
+activation energy	活化能	激活能
+solvent	溶剂	溶媒
+polymer	聚合物	高分子物
+electrolyte	电解质	电解液质
+electrode	电极	电级
+anode	阳极	正极板
+cathode	阴极	负极板
+gene expression	基因表达	基因表现
+protein	蛋白质	朊
+amino acid	氨基酸	胺基酸
+cell line	细胞系	细胞株系
+in vitro	体外	试管内
+in vivo	体内	活体内
+mutation	突变	变异
+sequencing	测序	定序
+phenotype	表型	表现型
+genotype	基因型	遗传型
+transcription factor	转录因子	转录因素
+signaling pathway	信号通路	讯号路径
+receptor	受体	接受器
+antibody	抗体	抗体蛋白
+cohort	队列	群组
+randomized controlled trial	随机对照试验	随机控制试验
+placebo	安慰剂	假药
+efficacy	疗效	效力
+adverse event	不良事件	副作用事件
+prevalence	患病率	流行率
+incidence	发病率	发生率
+sample size	样本量	样本大小
+control group	对照组	控制组
+case study	案例研究	个案研究
+literature review	文献综述	文献回顾
+methodology	方法论	方法学
+dataset	数据集	资料集
+data set	数据集	资料集
+open source	开源	开放源码
+source code	源代码	原始码
+trade-off	权衡	折衷
+proof of concept	概念验证	概念证明
+future work	未来工作	将来工作
+related work	相关工作	有关工作
+supplementary material	补充材料	附加材料
+appendix	附录	附件
+acknowledgments	致谢	感谢
+acknowledgements	致谢	感谢
