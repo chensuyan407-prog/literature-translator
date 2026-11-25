@@ -3,14 +3,21 @@ name: literature-translator
 description: Translate a scientific paper (PDF incl. scanned pages, Markdown, LaTeX, DOCX, HTML or text; English↔Chinese) into a paragraph-aligned bilingual result whose every segment points back to its page/block (with per-block boxes for paragraphs that cross columns or pages), with an executable term table (locked translations, forbidden variants, whole-document back-fill), protected formulas/citations/URLs, rebuilt display equations and table grids with crop images, a transcription entry for pages without a text layer, a time-budget scheduler with honest partial results and resume, and automatic checks for numbers (incl. 6 billion = 60 亿), units and counted nouns, figure/table/equation/section references in both directions, negation and qualifier scope, omissions and duplicates. Use for 文献翻译 / 论文翻译 / 双语对照 / 术语表 / 译文核验 tasks, whole papers or a page/section range.
 ---
 
-# literature-translator 0.3 — 术语锁定、段落对齐、可自检的文献翻译
+# literature-translator 0.3.1 — 术语锁定、段落对齐、可自检的文献翻译
 
 You (the agent) translate; the scripts do everything that must be exact and repeatable: reading order,
 formula/citation protection, table grids, equation rebuilding, the term table, checks, time budget and
 deliverables. **Never write translations into result.json by hand — always `tr.py put`. Outputs are
 regenerated after every put, so a valid partial result exists at all times.**
 
-`T=/skills/weekly-skill/scripts/tr.py` (or `scripts/tr.py` next to this file). Python ≥3.9; dependencies (`requirements.txt`):
+Locate the Python interpreter and skill root cleanly first (supports containers with `python3` only or alternate mount paths):
+```bash
+PY=$(command -v python3 || command -v python)
+for d in /skills/weekly-skill /app/submission /app/skills "${SKILL_DIR:-}" "$(pwd)"; do
+  [ -f "$d/scripts/tr.py" ] && T="$d/scripts/tr.py" && break
+done
+```
+(`T=/skills/weekly-skill/scripts/tr.py` by default). Python ≥3.9; dependencies (`requirements.txt`):
 `PyMuPDF>=1.23` for PDFs (1.28 and 2.x give identical segments) and `numpy>=1.22` for layout regions of scanned pages (without numpy every scanned page is
 one region — still usable with page+box locators, and the degradation is recorded in result.json); PDFs
 (automatic fallback to poppler `pdftotext`). State: `/app/work/lt`; deliverables: `/app/output`
@@ -21,12 +28,12 @@ one region — still usable with page+box locators, and the degradation is recor
 | step | requests | what |
 |---|---|---|
 | 1 | 1 | `cat /input/task.md /input/case.json` |
-| 2 | 1 | `python $T init` (+ `--pages/--sections/--target` only if the task restricts them) |
+| 2 | 1 | `$PY $T init` (+ `--pages/--sections/--target` only if the task restricts them) |
 | 2b | 1–3 | only if init prints `SCANNED`: transcribe regions (see below) |
-| 3 | 1 | glossary file + `python $T glossary FILE && python $T batch` |
-| 4 | 1 per batch | write the batch file + `python $T put FILE --next` |
-| 5 | 1–3 | fix `[error]` lines (`put` only corrected blocks); `python $T enforce` if a term changed |
-| 6 | 1 | `python $T finalize [--set FIELD=...]` |
+| 3 | 1 | glossary file + `$PY $T glossary FILE && $PY $T batch` |
+| 4 | 1 per batch | write the batch file + `$PY $T put FILE --next` |
+| 5 | 1–3 | fix `[error]` lines (`put` only corrected blocks); `$PY $T enforce` if a term changed |
+| 6 | 1 | `$PY $T finalize [--set FIELD=...]` |
 
 After each put a `TIME:` line reports seconds used, measured throughput and the projection. If it says
 **TIME WARNING**, keep going with `--next`: the scheduler sizes the next batch to the time left, puts all

@@ -1,4 +1,4 @@
-# literature-translator 0.3.0 — 术语锁定 · 段落对齐 · 可自检的科研文献翻译 Skill
+# literature-translator 0.3.1 — 术语锁定 · 段落对齐 · 可自检的科研文献翻译 Skill
 
 面向“阅读03｜文献翻译”。Agent 只负责“翻译文字”（以及扫描页的读图转录）；分段、公式/表格重建、引用保护、术语强制、
 核验、时间预算、版本记录与交付文件全部由脚本完成，可重复运行、可回到原文、可机器复核。
@@ -80,4 +80,4 @@ warning：数字次数不符或新增数字；单位缺失；计数名词被替�
 
 - 新学科：在 `resources/glossary_base.txt` 追加无歧义术语，或随任务提供术语表。
 - 新检查：在 `lt_core.check_segment` 中添加，并在 `eval/mutation_test.py` 加入对应注入类型，用未参与调参的段落复验误报。
-- 版本：0.3.0（2026-11-22）。作者：chensuyan407（Claude Code 协助开发）。
+- 版本：0.3.1（2026-11-25）。作者：chensuyan407（Claude Code + Antigravity 协助开发与优化）。

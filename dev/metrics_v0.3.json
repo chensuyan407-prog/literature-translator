@@ -1,7 +1,7 @@
 {
  "skill": "literature-translator",
  "version": "0.3.0",
- "ran_at": "2026-11-23T00:12:14.647134Z",
+ "ran_at": "2026-11-25T09:16:30.106983Z",
  "toy_example": {
   "injected_error_codes_expected": [
    "term_violation",
@@ -54,16 +54,16 @@
   },
   "clean_false_alarm_rate_error": 0.0,
   "baseline_compare": {
-   "pdf": "paper.pdf",
+   "pdf": "resnet.pdf",
    "pages": "1-2",
    "baseline_extractor": "pdftotext",
    "baseline": {
-    "chunks": 37,
+    "chunks": 46,
     "broken_sentence_boundaries": 8,
     "noise_lines_in_text": 11,
     "captions_glued_to_body": 0,
     "hyphen_line_breaks": 0,
-    "formula_fragment_lines": 2
+    "formula_fragment_lines": 3
    },
    "skill": {
     "segments": 24,
@@ -90,7 +90,7 @@
   "number_preservation": 1.0,
   "crossref_preservation": 1.0,
   "errors": 0,
-  "warnings": 0,
+  "warnings": 2,
   "mutation_detection_rate": 1.0,
   "mutations_applied": 113,
   "mutations_detected": 113,
@@ -110,16 +110,16 @@
   },
   "clean_false_alarm_rate_error": 0.0,
   "baseline_compare": {
-   "pdf": "paper.pdf",
+   "pdf": "attention.pdf",
    "pages": "1-2",
    "baseline_extractor": "pdftotext",
    "baseline": {
-    "chunks": 12,
-    "broken_sentence_boundaries": 1,
+    "chunks": 21,
+    "broken_sentence_boundaries": 0,
     "noise_lines_in_text": 1,
     "captions_glued_to_body": 0,
     "hyphen_line_breaks": 0,
-    "formula_fragment_lines": 0
+    "formula_fragment_lines": 3
    },
    "skill": {
     "segments": 21,
@@ -167,7 +167,7 @@
    "exit_code": 0,
    "status": "partial",
    "status_reason": "no segment translated yet",
-   "segments": 16,
+   "segments": 23,
    "uncertainty": [
     "parser warning p.-: fallback_extractor PyMuPDF unavailable: no bboxes, no math-font protection, simpler layout rules",
     "automatic checks verify numbers, units, placeholders (formulas/citations/URLs), cross-references, glossary terms, negation and qualifier cues; they do not prove semantic adequacy — warnings are listed in manual_review.md"
@@ -316,7 +316,8 @@
      "warnings": [
       "length_ratio",
       "negation_scope",
-      "number_count"
+      "number_count",
+      "polarity_check"
      ]
     },
     "swapped": {
@@ -347,9 +348,9 @@
    }
   },
   "heldout_attention_mutations": {
-   "detected": 17,
+   "detected": 22,
    "total": 22,
-   "detected_as_error": 13,
+   "detected_as_error": 15,
    "clean_segments": 20,
    "clean_with_error": 0,
    "clean_with_warn": 0,
@@ -374,13 +375,17 @@
      ]
     },
     "unit": {
-     "hit": false,
-     "errors": [],
+     "hit": true,
+     "errors": [
+      "unit_changed"
+     ],
      "warnings": []
     },
     "unit_time": {
-     "hit": false,
-     "errors": [],
+     "hit": true,
+     "errors": [
+      "unit_changed"
+     ],
      "warnings": []
     },
     "crossref": {
@@ -460,9 +465,11 @@
      ]
     },
     "qualifier": {
-     "hit": false,
+     "hit": true,
      "errors": [],
-     "warnings": []
+     "warnings": [
+      "qualifier_check"
+     ]
     },
     "qualifier2": {
      "hit": true,
@@ -485,7 +492,8 @@
       "placeholder_missing"
      ],
      "warnings": [
-      "length_ratio"
+      "length_ratio",
+      "unit_missing"
      ]
     },
     "swapped": {
@@ -499,13 +507,17 @@
      ],
      "warnings": [
       "number_added",
-      "sentence_count"
+      "polarity_check",
+      "sentence_count",
+      "unit_missing"
      ]
     },
     "semantic": {
-     "hit": false,
+     "hit": true,
      "errors": [],
-     "warnings": []
+     "warnings": [
+      "polarity_check"
+     ]
     },
     "semantic_cells": {
      "hit": true,
@@ -515,9 +527,11 @@
      "warnings": []
     },
     "semantic_binding": {
-     "hit": false,
+     "hit": true,
      "errors": [],
-     "warnings": []
+     "warnings": [
+      "subject_binding"
+     ]
     }
    }
   },
@@ -582,6 +596,10 @@
    "children_with_own_bbox": 14,
    "degraded_reason_in_result": false,
    "pending_in_scope": [
+    "S0066",
+    "S0067",
+    "S0068",
+    "S0069",
     "S0070",
     "S0071",
     "S0072",
@@ -609,10 +627,10 @@
     "S0094",
     "S0095",
     "S0096",
-    "S0097",
-    "S0098",
-    "S0099",
-    "S0100",
+    "S0231",
+    "S0232",
+    "S0233",
+    "S0234",
     "S0235",
     "S0236",
     "S0237",
@@ -640,11 +658,7 @@
     "S0259",
     "S0260",
     "S0261",
-    "S0262",
-    "S0263",
-    "S0264",
-    "S0265",
-    "S0266"
+    "S0262"
    ]
   },
   "scan_bert_no_numpy": {
@@ -888,7 +902,7 @@
     }
    },
    "replay_errors": 1,
-   "replay_warnings": 48,
+   "replay_warnings": 56,
    "error_segments": [
     "S0074"
    ],
@@ -927,5 +941,5 @@
   "segments_sha256_run2": "9071b4b873f0f23ba022094922342d1028d8fe3659f0ded743e05f5d25e8ecf3",
   "identical": true
  },
- "wall_time_s": 71.41
+ "wall_time_s": 72.48
 }

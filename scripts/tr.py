@@ -133,16 +133,30 @@ def guess_target(case, task_text, src_lang):
 
 
 def guess_scope(case, task_text):
-    """Return (pages, sections) restrictions found in the case, or (None, None)."""
+    """Return (pages, sections) restrictions found in nested case dicts or task instructions, or (None, None)."""
     pages = sections = None
-    for k in ("pages", "page_range", "page", "页码", "页"):
-        v = case.get(k) if isinstance(case, dict) else None
-        if v:
-            pages = v if isinstance(v, str) else (f"{v[0]}-{v[-1]}" if isinstance(v, list) and v else str(v))
-    for k in ("sections", "section", "range", "paragraphs", "章节", "范围"):
-        v = case.get(k) if isinstance(case, dict) else None
-        if v and isinstance(v, (str, list)):
-            sections = v if isinstance(v, str) else "|".join(map(str, v))
+
+    def _walk(obj):
+        nonlocal pages, sections
+        if not isinstance(obj, dict):
+            return
+        for k in ("pages", "page_range", "page", "页码", "页"):
+            v = obj.get(k)
+            if v and not pages:
+                pages = v if isinstance(v, str) else (f"{v[0]}-{v[-1]}" if isinstance(v, list) and v else str(v))
+        for k in ("sections", "section", "range", "paragraphs", "章节", "范围"):
+            v = obj.get(k)
+            if v and isinstance(v, (str, list)) and not sections:
+                sections = v if isinstance(v, str) else "|".join(map(str, v))
+        for v in obj.values():
+            if isinstance(v, dict):
+                _walk(v)
+
+    _walk(case if isinstance(case, dict) else {})
+    if not pages and task_text:
+        m = re.search(r"(?:translate\s+pages?|pages?\s*range|仅?翻译第)\s*(\d+(?:\s*[-–~至到]\s*\d+|\s*[,，]\s*\d+)*)(?:\s*页)?", task_text, re.I)
+        if m:
+            pages = m.group(1)
     return pages, sections
 
 
@@ -287,6 +301,7 @@ def cmd_init(a):
     st = {"version": C.VERSION, "case_id": (case.get("case_id") or case.get("id")) if isinstance(case, dict) else None,
           "contract": case.get("output_contract") if isinstance(case, dict) else None, "out": out, "work": work,
           "started": t0 if not a.started else float(a.started), "started_iso": C.now_iso(), "budget_s": a.budget,
+          "max_requests": a.max_requests, "req_reserve": a.req_reserve, "n_cmds": 1,
           "batch_units": a.batch_units, "n_puts": 0, "n_batches": 0, "uncertainty": [], "source": source or "",
           "other_sources": other_srcs, "src_lang": "en", "tgt_lang": a.target or "zh"}
     ctx = Ctx(work)
@@ -458,21 +473,31 @@ def cmd_glossary(a):
 
 
 def schedule(ctx):
-    """Throughput-based plan: units/s measured from init to now over translated units."""
+    """Throughput- and request-budget-based plan: units/s measured from init to now plus request cap guard."""
     budget, reserve = ctx.st.get("budget_s", 900), ctx.st.get("reserve_s", 120)
+    max_req, req_res = ctx.st.get("max_requests", 64), ctx.st.get("req_reserve", 6)
+    req_used = ctx.st.get("n_cmds", 1) + ctx.st.get("n_puts", 0)
+    req_left = max_req - req_res - req_used
     el = ctx.elapsed()
     todo = [s for s in ctx.segs if s.get("translate") and s.get("in_scope", True) and not s.get("needs_transcription")]
     done_u = sum(s["units"] for s in todo if ctx.trans.get(s["id"], {}).get("tgt"))
     left_u = sum(s["units"] for s in todo if not ctx.trans.get(s["id"], {}).get("tgt"))
     rate = done_u / el if done_u and el > 0 else None
     proj = el + left_u / rate if rate else None
+    bu = max(1, ctx.st.get("batch_units", 1300))
+    req_overrun = bool(left_u > max(0, req_left) * bu)
     return {"elapsed": el, "budget": budget, "reserve": reserve, "time_left": budget - reserve - el, "done_units": done_u,
-            "left_units": left_u, "rate": rate, "projected": proj, "overrun": bool(proj and proj > budget - reserve)}
+            "left_units": left_u, "rate": rate, "projected": proj, "overrun": bool(proj and proj > budget - reserve) or req_overrun,
+            "req_used": req_used, "max_requests": max_req, "req_left": req_left, "req_overrun": req_overrun}
 
 
 def next_batch(ctx, units=None, kinds=None, ids=None, redo=False, plan=True):
     units = units or ctx.st.get("batch_units", 1400)
     sch = schedule(ctx) if plan and not (kinds or ids or redo) else None
+    if sch and sch["req_left"] <= 0:
+        ctx.st["stop_reason"] = (f"request budget: {sch['req_used']} requests used of {sch['max_requests']} "
+                                 f"({ctx.st.get('req_reserve', 6)} reserved for check/finalize)")
+        return [], 0
     if sch and sch["rate"]:
         fit = int(sch["rate"] * max(0.0, sch["time_left"]) * 0.85)
         if fit < 40:
@@ -1055,6 +1080,8 @@ def main(argv=None):
     p.add_argument("--ocr", default="auto", choices=["auto", "force", "off"])
     p.add_argument("--budget", type=int, default=900)
     p.add_argument("--reserve", type=int, default=120, help="seconds kept for check/finalize at the end of the budget")
+    p.add_argument("--max-requests", type=int, default=64, help="model request cap guard")
+    p.add_argument("--req-reserve", type=int, default=6, help="requests reserved for check/enforce/finalize")
     p.add_argument("--batch-units", type=int, default=1300)
     p.add_argument("--started", help="unix time the run started (for the time budget)")
     p.add_argument("--no-base", action="store_true", help="do not auto-apply resources/glossary_base.txt")
@@ -1116,7 +1143,12 @@ def main(argv=None):
         print(f"no state in {a.work}; run `tr.py init` first (or pass --work)")
         return 2
     try:
-        return a.fn(a)
+        rv = a.fn(a)
+        if rv == 0 and a.cmd in ("glossary", "transcribe", "enforce", "session") and os.path.exists(os.path.join(a.work, "state.json")):
+            ctx = Ctx(a.work)
+            ctx.st["n_cmds"] = ctx.st.get("n_cmds", 1) + 1
+            ctx.save_state()
+        return rv
     except Exception as ex:  # keep outputs honest even on crashes
         import traceback
         traceback.print_exc()

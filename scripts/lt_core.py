@@ -12,7 +12,7 @@ import time
 import zipfile
 from collections import Counter, defaultdict
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 TAG_OPEN, TAG_CLOSE = "\ue000", "\ue001"
 PH_RE = re.compile(r"\{\{([MCU]\d+)\}\}")
 PH_LOOSE_RE = re.compile(r"[\{｛]\s*[\{｛]\s*([MCUmcu]\s*\d+)\s*[\}｝]\s*[\}｝]")
@@ -1039,7 +1039,7 @@ NEG_ZH_SRC = re.compile(r"不|没有|没|未|无|非|否|勿|缺乏|缺少|难�
 NEG_EN_TGT = NEG_EN
 
 QUALIFIERS = [
-    (r"\b(approximately|roughly|nearly|almost|around\s+\d|about\s+\d|~\s*\d|≈)", r"约|大约|大概|左右|近|几乎|差不多|~|≈|∼"),
+    (r"(?:\b(?:approximately|roughly|nearly|almost)|(?:\baround|\babout)\s+(?:\d|\{\{M\d+\}\})|(?:~|≈|∼)\s*(?:\d|\{\{M\d+\}\}))", r"约|大约|大概|左右|近|几乎|差不多|~|≈|∼"),
     (r"\bat least\b", r"至少|不少于|不低于|起码"),
     (r"\b(at most|up to\s+\d)", r"至多|最多|不超过|高达|多达|达"),
     (r"\b(more than|greater than|over\s+\d|exceed(?:s|ed|ing)?)", r"超过|多于|大于|高于|以上|超出|逾"),
@@ -1116,10 +1116,12 @@ REF_ZH_STRICT = re.compile(r"(?:(?<![代列报外发仪电时课统年])(表)|(?
                            r"|(?<![试企意地构视制插附蓝])(图))\s*[\(（]?\s*(S?\d+(?:\.\d+)*[a-z]?)(?![\d.])|第\s*(\d+(?:\.\d+)*)\s*([节章])")
 POLARITY = [  # English direction word -> acceptable Chinese renderings (warn only)
     (r"\b(small|smaller|smallest)\b", r"小|少|微|低|短"),
-    (r"\b(large|larger|largest)\b", r"大|多|高|广|巨|长"),
+    (r"\b(large|larger|largest|big|bigger|biggest)\b", r"大|多|高|广|巨|长"),
     (r"\b(high|higher|highest)\b", r"高|大|多|强"),
     (r"\b(low|lower|lowest)\b", r"低|小|少|弱|下"),
-    (r"\b(increas\w*)\b", r"增|升|提高|提升|加|扩大|变大|上涨|越来越|日益|逐渐|愈|渐"),
+    (r"\b(better|best)\b", r"好|优|佳|高|强|胜|更佳"),
+    (r"\b(worse|worst)\b", r"差|劣|弱|低|坏|更差"),
+    (r"\b(increas(?:e|ed|es|ing))\b", r"增|升|提高|提升|加|扩大|变大|上涨|越来越|日益|逐渐|愈|渐"),
     (r"\b(decreas\w*|reduc\w*)\b", r"减|降|少|缩|下降|变小|削"),
     (r"\b(faster|fastest)\b", r"快|速"),
     (r"\b(slower|slowest)\b", r"慢|缓"),
@@ -1144,6 +1146,36 @@ ZH_DATA = {("byte", 0): r"字节|B\b|bytes?", ("byte", 1): r"千字节|KB|kB|kil
            ("bit", 3): r"吉比特|千兆比特|Gbit|Gb|gigabits?"}
 RE_DATA_SRC = re.compile(r"(\d[\d,.]*)\s*(?:-\s*)?(" + "|".join(u for u, _, _ in DATA_UNITS) + r")\b")
 
+COMPUTE_UNITS = [
+    (r"(?:FLOPs|FLOP)", "flop", 0), (r"(?:kFLOPs|kFLOP|KFLOPS?)", "flop", 1),
+    (r"(?:MFLOPs|MFLOP|MFLOPS)", "flop", 2), (r"(?:GFLOPs|GFLOP|GFLOPS)", "flop", 3),
+    (r"(?:TFLOPs|TFLOP|TFLOPS)", "flop", 4), (r"(?:PFLOPs|PFLOP|PFLOPS)", "flop", 5),
+    (r"(?:EFLOPs|EFLOP|EFLOPS)", "flop", 6),
+]
+ZH_COMPUTE = {
+    ("flop", 0): r"(?<![kMGTPEkmgpte])(?:FLOPs?|浮点运算(?:次数)?)",
+    ("flop", 1): r"kFLOPs?|KFLOPS?|千次浮点",
+    ("flop", 2): r"MFLOPs?|MFLOPS|兆次浮点|百万次浮点",
+    ("flop", 3): r"GFLOPs?|GFLOPS|十亿次浮点",
+    ("flop", 4): r"TFLOPs?|TFLOPS|万亿次浮点",
+    ("flop", 5): r"PFLOPs?|PFLOPS|千万亿次浮点",
+    ("flop", 6): r"EFLOPs?|EFLOPS|百亿亿次浮点",
+}
+RE_COMPUTE_SRC = re.compile(r"(\d[\d,.]*|\{\{M\d+\}\})\s*(?:-\s*)?(" + "|".join(u for u, _, _ in COMPUTE_UNITS) + r")\b")
+
+TIME_UNITS = [
+    (r"milliseconds?|msecs?", "time", 1), (r"seconds?|secs?", "time", 2),
+    (r"minutes?|mins?", "time", 3), (r"hours?|hrs?", "time", 4),
+    (r"days?", "time", 5), (r"weeks?", "time", 6), (r"months?", "time", 7), (r"years?", "time", 8),
+]
+ZH_TIME = {
+    ("time", 1): r"毫秒|ms|milliseconds?", ("time", 2): r"秒|s\b|secs?|seconds?",
+    ("time", 3): r"分钟|mins?|minutes?", ("time", 4): r"小时|hrs?|hours?",
+    ("time", 5): r"天|日|days?", ("time", 6): r"周|星期|礼拜|weeks?",
+    ("time", 7): r"个月|月份|月|months?", ("time", 8): r"年|years?",
+}
+RE_TIME_SRC = re.compile(r"(\d[\d,.]*|\{\{M\d+\}\})\s*(?:-\s*)?(" + "|".join(u for u, _, _ in TIME_UNITS) + r")\b", re.I)
+
 PARTIAL_NEG = [  # partial / scoped negation: the Chinese must keep the scope, not just "a" negator somewhere
     (r"\bnot always\b", r"并非总|不总|未必|不一定|不是总|并不总|并非一直|不尽然|并不一直|不都"),
     (r"\bnot necessarily\b", r"不一定|未必|并不一定|不必然|并非必然"),
@@ -1159,6 +1191,10 @@ SUBJECTS = [  # subject words whose rendering must stay next to "their" number /
     (r"\blanguage models?\b", r"语言模型"),
     (r"\bbaselines?\b", r"基线"),
     (r"\b(?:our|the proposed) (?:model|method|system)\b|\bours\b", r"我们的|本文"),
+    (r"\bsemi-supervised(?:\s+(?:setting|training|setup|learning))?\b", r"半监督"),
+    (r"\bunsupervised(?:\s+(?:setting|training|setup|learning))?\b", r"无监督"),
+    (r"\bcontrol\s+group\b", r"对照组"),
+    (r"\btreatment\s+group\b", r"实验组|治疗组"),
 ]
 EVALUATIVE = [  # (english, chinese) evaluative words bound to a subject
     (r"\b(?:difficult|hard)\b", r"难"), (r"\beasy\b", r"易|便于|容易"),
@@ -1223,7 +1259,7 @@ def binding_issues(src, tgt):
                 out.append((m.start(), k, z))
         return sorted(out)
     a_tgt = zh_anchors(t)
-    items = [(m.group(0), m.start(), re.escape(m.group(0))) for m in re.finditer(r"\d+\.\d+%?|\d+%", s)]
+    items = [(m.group(0), m.start(), re.escape(m.group(0))) for m in re.finditer(r"\d+(?:\.\d+)?[KMBT]\b|\d+\.\d+%?|\d+%", s)]
     items += [(m.group(0), m.start(), z) for rx, z in EVALUATIVE for m in re.finditer(rx, s, re.I)]
     found = []
     for tok, pos, trx in items:
@@ -1377,6 +1413,28 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
             alts = COUNT_NOUNS.get(noun) or COUNT_NOUNS.get(re.sub(r"(es|s)$", "", noun)) or COUNT_NOUNS.get(noun[:-1])
             if alts and not re.search(alts, tgt, re.I):
                 add("counted_noun_changed", "warn", f"'{m.group(0).strip()}': the counted noun '{noun}' ({alts}) is not in the translation")
+        for m in RE_COMPUTE_SRC.finditer(src):
+            key = next(((fam, sc) for u, fam, sc in COMPUTE_UNITS if re.fullmatch(u, m.group(2))), None)
+            if not key or re.search(ZH_COMPUTE[key], tgt, re.I):
+                continue
+            other = [k for k, z in ZH_COMPUTE.items() if k != key and re.search(z, tgt, re.I) and not any(
+                re.fullmatch(u, cm.group(2)) and (fam, sc) == k
+                for cm in RE_COMPUTE_SRC.finditer(src) for u, fam, sc in COMPUTE_UNITS)]
+            if other:
+                add("unit_changed", "error", f"'{m.group(0)}' ({key[0]}, 1000^{key[1]}) is rendered as scale 1000^{other[0][1]} in the translation")
+            else:
+                add("unit_missing", "warn", f"compute unit of '{m.group(0)}' not found in the translation")
+        for m in RE_TIME_SRC.finditer(src):
+            key = next(((fam, sc) for u, fam, sc in TIME_UNITS if re.fullmatch(u, m.group(2), re.I)), None)
+            if not key or re.search(ZH_TIME[key], tgt, re.I):
+                continue
+            src_keys = {next(((fam, sc) for u, fam, sc in TIME_UNITS if re.fullmatch(u, tm.group(2), re.I)), None)
+                        for tm in RE_TIME_SRC.finditer(src)}
+            other = [k for k, z in ZH_TIME.items() if k != key and k not in src_keys and re.search(z, tgt, re.I)]
+            if other:
+                add("unit_changed", "error", f"'{m.group(0)}' (time unit {m.group(2)}) was changed to another time unit in the translation")
+            else:
+                add("unit_missing", "warn", f"time unit of '{m.group(0)}' not found in the translation")
     # 5. cross references (figures, tables, equations, sections) in both directions
     if src_lang == "en":
         src_refs = set()
@@ -1459,10 +1517,15 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
                     add("negation_scope", "warn", f"'{mm.group(0)}' (scoped negation) has no scoped rendering ({zh.split('|')[0]}…) in the translation")
         # 7. qualifiers / logical connectives; quantifiers that widen a claim
         rules = QUALIFIERS if src_lang == "en" else QUALIFIERS_ZH
-        for srx, trx in rules:
-            ms = re.search(srx, strip_ph(src), re.I)
-            if ms and not re.search(trx, tgt, re.I):
-                add("qualifier_check", "warn", f"'{ms.group(0)}' — no corresponding qualifier/connective found; confirm the limiting/logical relation is kept")
+        plain_q = strip_ph(src) if src_lang != "en" else src
+        for idx_q, (srx, trx) in enumerate(rules):
+            ms = list(re.finditer(srx, plain_q, re.I))
+            if not ms:
+                continue
+            if not re.search(trx, tgt, re.I):
+                add("qualifier_check", "warn", f"'{ms[0].group(0)}' — no corresponding qualifier/connective found; confirm the limiting/logical relation is kept")
+            elif idx_q == 0 and src_lang == "en" and len(ms) > len(re.findall(trx, tgt, re.I)):
+                add("qualifier_check", "warn", f"source has {len(ms)} approximation cues ('{ms[0].group(0)}'…), fewer found in the translation")
         if src_lang == "en" and tgt_lang == "zh":
             mu = UNIV_ZH.search(t_plain)
             if mu and not UNIV_EN.search(strip_ph(src)):
@@ -1470,11 +1533,17 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
             for msg in binding_issues(src, tgt):
                 add("subject_binding", "warn", msg + " — check who/what the value refers to")
             # direction words (small/large, high/low, increase/decrease ...): a missing pole hints at a reversed claim
-            for rx, zh in POLARITY:
-                ms = next((m for m in re.finditer(rx, strip_ph(src), re.I) if not m.group(0).isupper()), None)  # LARGE = a name
-                if ms and not re.search(zh, t_plain):
-                    add("polarity_check", "warn", f"'{ms.group(0)}' has no counterpart ({zh}) in the translation; check the direction of the claim")
+            pol_pairs = list(zip(s_sents, t_sents)) if aligned else [(strip_ph(src), t_plain)]
+            pol_hit = False
+            for a, b in pol_pairs:
+                if pol_hit:
                     break
+                for rx, zh in POLARITY:
+                    ms = next((m for m in re.finditer(rx, a, re.I) if not m.group(0).isupper()), None)  # LARGE = a name
+                    if ms and not re.search(zh, b):
+                        add("polarity_check", "warn", f"'{ms.group(0)}' has no counterpart ({zh}) in the translation; check the direction of the claim")
+                        pol_hit = True
+                        break
     # 8. glossary
     if gl:
         hits = find_terms(src, gl)

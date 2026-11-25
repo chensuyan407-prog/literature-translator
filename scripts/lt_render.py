@@ -381,6 +381,8 @@ CONTRACT_HINTS = [
 
 
 def _want_type(spec):
+    if isinstance(spec, dict) and isinstance(spec.get("type"), str):
+        spec = spec["type"]
     s = json.dumps(spec, ensure_ascii=False).lower() if not isinstance(spec, str) else spec.lower()
     if isinstance(spec, list) or re.search(r"\blist\b|array|\[\]|列表|数组", s):
         return "list"
@@ -388,11 +390,34 @@ def _want_type(spec):
         return "object"
     if re.search(r"\bstring\b|\bstr\b|\btext\b|字符串|文本", s):
         return "string"
-    if re.search(r"number|float|\bint|数值|数字", s):
+    if re.search(r"number|float|\bint|integer|数值|数字", s):
         return "number"
     if re.search(r"bool", s):
         return "boolean"
     return None
+
+
+def contract_schema(contract):
+    """Normalize flat contracts, JSON Schema objects (properties/required), and deliverables dicts into {field: spec}."""
+    if not isinstance(contract, dict):
+        return contract if isinstance(contract, list) else {}
+    src = contract.get("deliverables") if isinstance(contract.get("deliverables"), dict) and len(contract) == 1 else contract
+    if "properties" in src or ("required" in src and isinstance(src.get("required"), list)):
+        fields = {}
+        props = src.get("properties")
+        if isinstance(props, dict):
+            fields.update(props)
+        req = src.get("required")
+        if isinstance(req, list):
+            for name in req:
+                if isinstance(name, str) and name not in fields:
+                    fields[name] = None
+        if isinstance(src.get("deliverables"), dict):
+            for name, spec in src["deliverables"].items():
+                if isinstance(name, str) and name not in fields:
+                    fields[name] = spec
+        return fields
+    return src
 
 
 def coerce(value, want):
@@ -439,7 +464,8 @@ def coerce(value, want):
 def fill_contract(contract, core):
     """Map output_contract field names to core result fields. Returns (filled, unfilled_names)."""
     filled, unfilled = {}, []
-    names = list(contract.keys()) if isinstance(contract, dict) else (contract if isinstance(contract, list) else [])
+    schema = contract_schema(contract)
+    names = list(schema.keys()) if isinstance(schema, dict) else (schema if isinstance(schema, list) else [])
     for name in names:
         if not isinstance(name, str):
             continue
@@ -459,9 +485,10 @@ def apply_contract_types(contract, res):
     """Coerce every contract field to its declared type. Returns (coercions, gaps): a value that cannot be converted
     (e.g. confidence_level: number given "unavailable") is replaced by null and reported as a gap with the reason."""
     done, gaps = [], []
-    if not isinstance(contract, dict):
+    schema = contract_schema(contract)
+    if not isinstance(schema, dict):
         return done, gaps
-    for name, spec in contract.items():
+    for name, spec in schema.items():
         want = _want_type(spec)
         if name not in res or res[name] is None:
             gaps.append({"field": name, "expected": want or spec, "got": None,
@@ -490,10 +517,14 @@ def build_result(st, segs, trans, gl, issues, metrics, tstats, dropped, changes,
     if st.get("fatal"):
         status, reason = "failed", st["fatal"]
     elif metrics["translated_segments"] == 0:
-        status = "failed" if in_scope == 0 else "partial"
-        reason = ("no translatable text was found" + (f" ({metrics['missing_source_pages']} page(s) have no usable text layer and OCR was unavailable)" if metrics["missing_source_pages"] else "")) if in_scope == 0 else \
-            ("no segment translated yet" + (f"; {metrics['regions_needing_transcription']} scanned region(s) await transcription (no text layer, no OCR)"
-                                            if metrics["regions_needing_transcription"] else ""))
+        if in_scope == 0 and metrics["kept_original_segments"] > 0 and not metrics["missing_source_pages"] and pending == 0:
+            status = "success"
+            reason = f"all {metrics['kept_original_segments']} in-scope segment(s) intentionally kept original (no translatable prose)"
+        else:
+            status = "failed" if in_scope == 0 else "partial"
+            reason = ("no translatable text was found" + (f" ({metrics['missing_source_pages']} page(s) have no usable text layer and OCR was unavailable)" if metrics["missing_source_pages"] else "")) if in_scope == 0 else \
+                ("no segment translated yet" + (f"; {metrics['regions_needing_transcription']} scanned region(s) await transcription (no text layer, no OCR)"
+                                                if metrics["regions_needing_transcription"] else ""))
     elif metrics["untranslated_segments"] or metrics["missing_source_pages"] or pending:
         status = "partial"
         reason = f"{metrics['untranslated_segments']} of {in_scope} in-scope segments untranslated" + \
