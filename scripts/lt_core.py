@@ -12,7 +12,7 @@ import time
 import zipfile
 from collections import Counter, defaultdict
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 TAG_OPEN, TAG_CLOSE = "\ue000", "\ue001"
 PH_RE = re.compile(r"\{\{([MCU]\d+)\}\}")
 PH_LOOSE_RE = re.compile(r"[\{｛]\s*[\{｛]\s*([MCUmcu]\s*\d+)\s*[\}｝]\s*[\}｝]")
@@ -733,8 +733,27 @@ def foreign_sentences(text, tgt_lang):
     return [c for c in re.findall(r"[一-鿿][^。！？]{6,}[。！？]", t) if han_count(c) >= 6]
 
 
+def _hard_slice_text(text, lang, max_units):
+    """Hard-split an unpunctuated or unspaced mega-sentence into <= max_units chunks without breaking {{M1}}/{{C1}}/{{U1}} placeholders."""
+    toks = re.findall(r"\{\{[MCU]\d+\}\}|\S+|\s+", text) if lang != "zh" else re.findall(r"\{\{[MCU]\d+\}\}|.", text, re.S)
+    out, cur, cur_str = [], [], ""
+    limit_chars = int(max_units * 1.45) if lang == "zh" else max_units * 10
+    for tk in toks:
+        cand = cur_str + tk
+        over = (len(cand) > limit_chars) if lang == "zh" else (size_units(cand, lang) > max_units or len(cand) > limit_chars)
+        if cur and over:
+            out.append(cur_str.strip())
+            cur, cur_str = [tk], tk
+        else:
+            cur.append(tk)
+            cur_str = cand
+    if cur_str.strip():
+        out.append(cur_str.strip())
+    return out or [text]
+
+
 def _split_oversized_paragraphs(segs, max_units=900):
-    """Split huge single paragraphs at sentence boundaries so batch 1 never exceeds token/time budgets."""
+    """Split huge single paragraphs (including unspaced CJK / punctuation-free text) so batch 1 stays bounded."""
     out = []
     for s in segs:
         if s.get("kind") != "paragraph" or not s.get("translate"):
@@ -742,25 +761,27 @@ def _split_oversized_paragraphs(segs, max_units=900):
             continue
         lang = detect_lang(strip_ph(s.get("prot", "")))
         lang = lang if lang != "und" else "en"
-        if size_units(s.get("prot", ""), lang) <= max_units:
+        if size_units(s.get("prot", ""), lang) <= max_units and len(s.get("prot", "")) <= max_units * 10:
             out.append(s)
             continue
-        sents = split_sentences(s.get("prot", ""), lang)
-        if len(sents) <= 1:
-            # hard word/char split as last resort when a massive blob has no sentence punctuation
-            words = s.get("prot", "").split(" ")
-            step = max(200, max_units // 2)
-            sents = [" ".join(words[k:k + step]) for k in range(0, len(words), step)]
+        raw_sents = split_sentences(s.get("prot", ""), lang)
+        sents = []
+        for sent in raw_sents:
+            if size_units(sent, lang) > max_units or len(sent) > max_units * 10:
+                sents.extend(_hard_slice_text(sent, lang, max_units))
+            else:
+                sents.append(sent)
+        joiner = "" if lang == "zh" else " "
         chunks, cur = [], []
         for sent in sents:
-            cand = " ".join(cur + [sent]) if cur else sent
-            if cur and size_units(cand, lang) > max_units:
-                chunks.append(" ".join(cur))
+            cand = joiner.join(cur + [sent]) if cur else sent
+            if cur and (size_units(cand, lang) > max_units or len(cand) > max_units * 10):
+                chunks.append(joiner.join(cur))
                 cur = [sent]
             else:
                 cur.append(sent)
         if cur:
-            chunks.append(" ".join(cur))
+            chunks.append(joiner.join(cur))
         ph_all = s.get("ph") or {}
         for ci, ch in enumerate(chunks):
             ch_ph = {k: v for k, v in ph_all.items() if "{{" + k + "}}" in ch}

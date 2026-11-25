@@ -400,7 +400,7 @@ def _want_type(spec):
 
 
 def contract_schema(contract):
-    """Normalize flat contracts, JSON Schema (properties/required), output_fields/fields, and deliverables into {field: spec}."""
+    """Normalize flat contracts, JSON Schema (properties/required), output_fields/fields, deliverables, and merged contracts."""
     if isinstance(contract, list):
         out = {}
         for item in contract:
@@ -413,6 +413,13 @@ def contract_schema(contract):
         return out
     if not isinstance(contract, dict):
         return {}
+    if isinstance(contract.get("_merged_contracts"), list):
+        merged = {}
+        for sub in contract["_merged_contracts"]:
+            for k, v in contract_schema(sub).items():
+                if k not in merged:
+                    merged[k] = v
+        return merged
     if isinstance(contract.get("deliverables"), (dict, list)) and len(contract) == 1:
         return contract_schema(contract["deliverables"])
     for k in ("output_contract", "output_fields", "fields", "required_fields", "schema"):
@@ -433,13 +440,36 @@ def contract_schema(contract):
                 if k not in fields:
                     fields[k] = v
         return fields
-    if "output_fields" in contract or "fields" in contract:
+    if "output_fields" in contract or "fields" in contract or "deliverables" in contract:
         fields = {}
-        for k in ("output_fields", "fields"):
+        for k in ("output_fields", "fields", "deliverables"):
             if k in contract:
-                fields.update(contract_schema(contract[k]))
+                for fk, fv in contract_schema(contract[k]).items():
+                    if fk not in fields:
+                        fields[fk] = fv
+        for k, v in contract.items():
+            if k not in ("output_fields", "fields", "deliverables", "type") and k not in fields:
+                fields[k] = v
         return fields
     return contract
+
+
+def contract_required_fields(contract):
+    """Return set of required top-level field names when schema specifies `required`, else all schema keys."""
+    if isinstance(contract, dict):
+        if isinstance(contract.get("_merged_contracts"), list):
+            req = set()
+            for sub in contract["_merged_contracts"]:
+                req |= contract_required_fields(sub)
+            return req
+        if "properties" in contract:
+            if isinstance(contract.get("required"), list):
+                r = {x for x in contract["required"] if isinstance(x, str)}
+                if "deliverables" in contract:
+                    r |= set(contract_schema(contract["deliverables"]).keys())
+                return r
+            return set()  # JSON Schema with properties but no required array -> all optional
+    return set(contract_schema(contract).keys())
 
 
 def coerce(value, want):
@@ -511,26 +541,72 @@ def fill_contract(contract, core):
     return filled, unfilled
 
 
+def _type_matches(val, want):
+    if want is None:
+        return True
+    if want == "list":
+        return isinstance(val, list)
+    if want == "object":
+        return isinstance(val, dict)
+    if want == "string":
+        return isinstance(val, str)
+    if want == "integer":
+        return isinstance(val, int) and not isinstance(val, bool)
+    if want == "number":
+        return isinstance(val, (int, float)) and not isinstance(val, bool)
+    if want == "boolean":
+        return isinstance(val, bool)
+    return True
+
+
+def _validate_nested(val, spec, path, gaps):
+    """Recursively validate JSON Schema array items and object properties, recording field paths into gaps."""
+    if not isinstance(spec, dict):
+        return
+    if isinstance(val, list) and isinstance(spec.get("items"), dict):
+        ispec = spec["items"]
+        iwant = _want_type(ispec)
+        for idx, item in enumerate(val[:100]):
+            ipath = f"{path}[{idx}]"
+            if iwant and not _type_matches(item, iwant):
+                gaps.append({"field": ipath, "expected": iwant, "got": type(item).__name__,
+                             "reason": f"nested item {ipath} has type {type(item).__name__}, expected {iwant}"})
+            else:
+                _validate_nested(item, ispec, ipath, gaps)
+    elif isinstance(val, dict):
+        props = spec.get("properties") if isinstance(spec.get("properties"), dict) else {}
+        req = set(spec.get("required") or []) if isinstance(spec.get("required"), list) else set()
+        for rname in sorted(req):
+            if rname not in val or val[rname] is None:
+                gaps.append({"field": f"{path}.{rname}", "expected": _want_type(props.get(rname)) or "value", "got": None,
+                             "reason": f"nested required field {path}.{rname} is missing or null"})
+        for pname, pspec in props.items():
+            if pname in val and val[pname] is not None:
+                pwant = _want_type(pspec)
+                if pwant and not _type_matches(val[pname], pwant):
+                    gaps.append({"field": f"{path}.{pname}", "expected": pwant, "got": type(val[pname]).__name__,
+                                 "reason": f"nested field {path}.{pname} has type {type(val[pname]).__name__}, expected {pwant}"})
+                else:
+                    _validate_nested(val[pname], pspec, f"{path}.{pname}", gaps)
+
+
 def apply_contract_types(contract, res):
-    """Coerce every contract field to its declared type. Returns (coercions, gaps): a value that cannot be converted
-    (e.g. confidence_level: number given "unavailable") is replaced by null and reported as a gap with the reason."""
+    """Coerce every contract field to its declared type and validate nested schemas. Returns (coercions, gaps)."""
     done, gaps = [], []
     schema = contract_schema(contract)
     if not isinstance(schema, dict):
         return done, gaps
+    req_fields = contract_required_fields(contract)
     for name, spec in schema.items():
         want = _want_type(spec)
         if name not in res or res[name] is None:
-            gaps.append({"field": name, "expected": want or spec, "got": None,
-                         "reason": "no value: the Skill could not map this field and the agent did not set it (tr.py finalize --set)"})
+            if name in req_fields:
+                gaps.append({"field": name, "expected": want or spec, "got": None,
+                             "reason": "no value: the Skill could not map this field and the agent did not set it (tr.py finalize --set)"})
             res.setdefault(name, None)
             continue
         val, changed = coerce(res[name], want)
-        ok = want is None or (want == "list" and isinstance(val, list)) or (want == "object" and isinstance(val, dict)) or \
-            (want == "string" and isinstance(val, str)) or (want == "integer" and isinstance(val, int) and not isinstance(val, bool)) or \
-            (want == "number" and isinstance(val, (int, float)) and not isinstance(val, bool)) or \
-            (want == "boolean" and isinstance(val, bool))
-        if not ok:
+        if not _type_matches(val, want):
             gaps.append({"field": name, "expected": want, "got": res[name] if isinstance(res[name], (str, int, float, bool)) else type(res[name]).__name__,
                          "reason": f"value of type {type(res[name]).__name__} cannot be converted to {want}; field set to null"})
             res[name] = None
@@ -538,6 +614,7 @@ def apply_contract_types(contract, res):
         if changed:
             done.append({"field": name, "declared": spec, "from": type(res[name]).__name__, "to": type(val).__name__})
             res[name] = val
+        _validate_nested(res[name], spec, name, gaps)
     return done, gaps
 
 

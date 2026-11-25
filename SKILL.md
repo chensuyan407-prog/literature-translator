@@ -3,7 +3,7 @@ name: literature-translator
 description: Translate a scientific paper (PDF incl. scanned pages, Markdown, LaTeX, DOCX, HTML or text; English↔Chinese) into a paragraph-aligned bilingual result whose every segment points back to its page/block (with per-block boxes for paragraphs that cross columns or pages), with an executable term table (locked translations, forbidden variants, whole-document back-fill), protected formulas/citations/URLs, rebuilt display equations and table grids with crop images, a transcription entry for pages without a text layer, a time-budget scheduler with honest partial results and resume, and automatic checks for numbers (incl. 6 billion = 60 亿), units and counted nouns, figure/table/equation/section references in both directions, negation and qualifier scope, omissions and duplicates. Use for 文献翻译 / 论文翻译 / 双语对照 / 术语表 / 译文核验 tasks, whole papers or a page/section range.
 ---
 
-# literature-translator 0.3.2 — 术语锁定、段落对齐、可自检的文献翻译
+# literature-translator 0.3.3 — 术语锁定、段落对齐、可自检的文献翻译
 
 You (the agent) translate; the scripts do everything that must be exact and repeatable: reading order,
 formula/citation protection, table grids, equation rebuilding, the term table, checks, time budget and

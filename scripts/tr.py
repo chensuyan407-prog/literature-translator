@@ -76,42 +76,49 @@ class Ctx:
 # ---------------------------------------------------------------- case discovery
 CONTRACT_KEYS = ("output_contract", "outputs_contract", "output_schema", "required_outputs", "output_fields", "schema", "deliverables")
 PRIMARY_KEY_RX = re.compile(r"^(source|paper|manuscript|document|article|input_file|primary|main_file|原文|论文|主文件)$", re.I)
+PRIMARY_ROLE_RX = re.compile(r"^(primary|main|source|paper|manuscript|target|原文|论文|主文件)$", re.I)
+SUPP_ROLE_RX = re.compile(r"^(supplement|supporting|appendix|aux|auxiliary|reference|glossary|termbase|补充|附录|词表)$", re.I)
 
 
 def discover_contract(case):
     if not isinstance(case, dict):
         return None
-    for k in CONTRACT_KEYS:
-        if case.get(k) is not None:
-            return case[k]
-    return None
+    found = [case[k] for k in CONTRACT_KEYS if case.get(k) is not None]
+    if not found:
+        return None
+    return found[0] if len(found) == 1 else {"_merged_contracts": found}
 
 
-def _walk_strings_keyed(obj, key=""):
+def _walk_strings_keyed(obj, key="", role=""):
     if isinstance(obj, str):
-        yield key, obj
+        yield key, role, obj
     elif isinstance(obj, dict):
+        r = str(obj.get("role") or obj.get("kind") or obj.get("type") or role or "")
         for k, v in obj.items():
-            yield from _walk_strings_keyed(v, str(k))
+            if k in ("role", "kind", "type") and isinstance(v, str):
+                continue
+            yield from _walk_strings_keyed(v, str(k), r)
     elif isinstance(obj, list):
         for v in obj:
-            yield from _walk_strings_keyed(v, key)
+            yield from _walk_strings_keyed(v, key, role)
 
 
 def discover(case_path, explicit_source):
     case = C.read_json(case_path, {}) if case_path and os.path.exists(case_path) else {}
     base = os.path.dirname(os.path.abspath(case_path)) if case_path else os.getcwd()
     roots = [base, "/input", os.path.join(base, "materials"), "/input/materials", os.getcwd()]
-    files, primary_cands = [], []
-    for key, s in _walk_strings_keyed(case):
+    files, primary_cands, supp_cands = [], [], []
+    for key, role, s in _walk_strings_keyed(case):
         if len(s) < 260 and re.search(r"\.(pdf|txt|md|markdown|tex|docx|html?|tsv|csv|xlsx|json)$", s, re.I):
             for r in roots:
                 cand = s if os.path.isabs(s) else os.path.join(r, s)
                 if os.path.isfile(cand):
                     ap = os.path.abspath(cand)
                     files.append(ap)
-                    if PRIMARY_KEY_RX.match(key):
+                    if PRIMARY_ROLE_RX.match(role) or PRIMARY_KEY_RX.match(key):
                         primary_cands.append(ap)
+                    elif SUPP_ROLE_RX.match(role):
+                        supp_cands.append(ap)
                     break
     if not files:
         for r in (base, os.path.join(base, "materials"), "/input", "/input/materials"):
@@ -122,18 +129,21 @@ def discover(case_path, explicit_source):
                         files.append(os.path.abspath(fp))
     files = list(dict.fromkeys(files))
     primary_cands = list(dict.fromkeys(primary_cands))
+    supp_cands = set(supp_cands)
     gloss = [f for f in files if (GLOSS_HINT.search(os.path.basename(f)) or f.lower().endswith((".tsv", ".csv", ".xlsx"))) and f not in primary_cands]
     srcs = [f for f in files if f not in gloss and f.lower().endswith(SRC_EXT)]
     if explicit_source:
         source = os.path.abspath(explicit_source)
     else:
         p_srcs = [f for f in primary_cands if f in srcs]
+        non_supp = [f for f in srcs if f not in supp_cands]
+        pool = p_srcs or non_supp or srcs
         if p_srcs:
             p_pdfs = [f for f in p_srcs if f.lower().endswith(".pdf")]
             source = p_pdfs[0] if p_pdfs else p_srcs[0]
         else:
-            pdfs = [f for f in srcs if f.lower().endswith(".pdf")]
-            source = max(pdfs, key=os.path.getsize) if pdfs else (max(srcs, key=os.path.getsize) if srcs else None)
+            pdfs = [f for f in pool if f.lower().endswith(".pdf")]
+            source = max(pdfs, key=os.path.getsize) if pdfs else (max(pool, key=os.path.getsize) if pool else None)
     task_text = ""
     for tp in (os.path.join(base, "task.md"), "/input/task.md", os.path.join(os.getcwd(), "task.md")):
         if os.path.exists(tp):
@@ -341,7 +351,8 @@ def cmd_init(a):
         print(f"FAILED: {st['fatal']}\nresult.json written with status=failed -> {out}")
         return 2
     case, source, gloss_files, other_srcs, task_text = discover(a.case, a.source)
-    st = {"version": C.VERSION, "case_id": (case.get("case_id") or case.get("id")) if isinstance(case, dict) else None,
+    cid = (case.get("case_id") if case.get("case_id") is not None else case.get("id")) if isinstance(case, dict) else None
+    st = {"version": C.VERSION, "case_id": cid,
           "contract": discover_contract(case), "out": out, "work": work,
           "started": t0 if not a.started else float(a.started), "started_iso": C.now_iso(), "budget_s": a.budget,
           "max_requests": a.max_requests, "req_reserve": a.req_reserve, "n_cmds": 1,
@@ -1047,19 +1058,45 @@ def cmd_status(a):
     return 0
 
 
+PROTECTED_CORE_FIELDS = {
+    "case_id", "status", "status_reason", "skill", "source", "direction", "scope",
+    "outputs", "metrics", "coverage", "segments", "pairs", "translation_text",
+    "untranslated", "glossary", "qa", "manual_review", "verification_notes",
+    "resume", "changes", "dropped_non_body", "sources", "run",
+}
+
+
 def cmd_finalize(a):
     ctx = Ctx(a.work)
-    extra = dict(ctx.st.get("extra_fields", {}))
+    pending = dict(ctx.st.get("extra_fields", {}))
     for kv in a.set or []:
         k, _, v = kv.partition("=")
-        extra[k.strip()] = v
+        k = k.strip()
+        if k in PROTECTED_CORE_FIELDS:
+            print(f"IGNORED protected core field '{k}' in --set (computed from actual state)")
+            continue
+        pending[k] = v
     for kv in a.set_json or []:
         k, _, v = kv.partition("=")
-        v = v.strip()
-        extra[k.strip()] = json.load(open(v[1:] if v.startswith("@") else v, encoding="utf-8")) if os.path.exists(v.lstrip("@")) else json.loads(v)
+        k, v = k.strip(), v.strip()
+        if k in PROTECTED_CORE_FIELDS:
+            print(f"IGNORED protected core field '{k}' in --set-json (computed from actual state)")
+            continue
+        try:
+            if v.startswith("@") and os.path.exists(v[1:]):
+                with open(v[1:], encoding="utf-8") as fh:
+                    pending[k] = json.load(fh)
+            elif os.path.exists(v):
+                with open(v, encoding="utf-8") as fh:
+                    pending[k] = json.load(fh)
+            else:
+                pending[k] = json.loads(v)
+        except Exception as ex:
+            print(f"ERROR invalid --set-json for '{k}': {ex}; existing result.json preserved untouched.")
+            return 2
     for u in a.uncertainty or []:
         ctx.st.setdefault("uncertainty", []).append(u)
-    ctx.st["extra_fields"] = extra
+    ctx.st["extra_fields"] = pending
     res, issues, metrics = refresh(ctx)
     m = metrics
     print(f"FINAL status={res['status']} ({res['status_reason']})")
@@ -1223,13 +1260,27 @@ def main(argv=None):
                 pass
         err_out = err_out or default_dir("out")
         os.makedirs(err_out, exist_ok=True)
-        C.write_json(os.path.join(err_out, "result.json"), {
-            "case_id": err_cid,
-            "status": "failed",
-            "status_reason": f"tr.py {a.cmd} failed: {type(ex).__name__}: {ex}",
-            "skill": {"name": "literature-translator", "version": C.VERSION},
-        })
-        print(f"tr.py {a.cmd} crashed: {ex}. result.json written with status=failed -> {err_out}")
+        rpath = os.path.join(err_out, "result.json")
+        note = f"tr.py {a.cmd} failed: {type(ex).__name__}: {ex}"
+        existing = None
+        if a.cmd != "init" and os.path.exists(rpath):
+            try:
+                existing = C.read_json(rpath, None)
+            except Exception:
+                existing = None
+        if isinstance(existing, dict) and ("segments" in existing or "pairs" in existing):
+            existing.setdefault("uncertainty", []).append(note)
+            existing["status_reason"] = (existing.get("status_reason") or "") + f"; {note}"
+            C.write_json(rpath, existing)
+            print(f"tr.py {a.cmd} crashed: {ex}. preserved existing result.json -> {err_out}")
+        else:
+            C.write_json(rpath, {
+                "case_id": err_cid,
+                "status": "failed",
+                "status_reason": note,
+                "skill": {"name": "literature-translator", "version": C.VERSION},
+            })
+            print(f"tr.py {a.cmd} crashed: {ex}. result.json written with status=failed -> {err_out}")
         return 3
 
 
