@@ -40,7 +40,7 @@ resume command are written to result.json; never pretend unfinished parts were t
 2. **Init** finds the source and any glossary file in case.json / `/input`. Options: `--source FILE`,
    `--password PW`, `--pages 3-5` or `5,6,12`, `--sections "Introduction..Related Work"` / `"Methods|Results"`,
    `--target zh|en`. It prints segment counts, equations that need confirmation, scanned regions, term candidates
-   and the terms already locked (case glossary > yours > `resources/glossary_base.tsv`).
+   and the terms already locked (case glossary > yours > `resources/glossary_base.txt`).
 3. **Scanned pages (no text layer, no OCR).** Each layout region becomes a segment with a crop image
    (`/app/output/crops/S0012.png`; ids and boxes are drawn on `previews/page_NNN.png`). Region ids depend on the
    layout pass, so **address what you read by page and box** (PDF points, as on the preview) and give it a label:

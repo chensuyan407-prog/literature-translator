@@ -50,7 +50,7 @@ formula fragments) next to what `tr.py init` produced on the same pages.
 
 ## 6. Reuse on a new discipline
 
-1. Add unambiguous field terms to `resources/glossary_base.tsv`, or supply a case glossary.
+1. Add unambiguous field terms to `resources/glossary_base.txt`, or supply a case glossary.
 2. Run `init` on a few papers of the field; inspect `previews/` and `dropped.jsonl` for layout misreads.
 3. Translate one excerpt, run `mutation_test.py` on it, and add a check (in `lt_core.check_segment`)
    plus an injection type (here) for any field-specific error you meet (e.g. chemical formulas, gene names).

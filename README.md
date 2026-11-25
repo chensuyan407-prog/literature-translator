@@ -24,7 +24,7 @@
 - 可选：`tesseract`（含 `chi_sim`）做扫描页 OCR；`openpyxl` 读取 .xlsx 术语表。无网络依赖，不调用外部 API。
 - 文件：`SKILL.md`、`scripts/tr.py`（CLI）、`scripts/lt_core.py`（分段/保护/术语/核验）、`scripts/lt_render.py`（交付文件）、
   `scripts/pdf_layout.py`（版式解析，源自作者此前的 pdf-evidence-reader 0.2，本版新增行级陈列公式、题注锚定表格、数学字体标记）、
-  `resources/glossary_base.tsv`、`eval/`（变异测试、基线对比、评分表）、`examples/`。
+  `resources/glossary_base.txt`、`eval/`（变异测试、基线对比、评分表）、`examples/`。
 
 ## 3. 使用
 
@@ -78,6 +78,6 @@ warning：数字次数不符或新增数字；单位缺失；计数名词被替�
 
 ## 7. 维护
 
-- 新学科：在 `resources/glossary_base.tsv` 追加无歧义术语，或随任务提供术语表。
+- 新学科：在 `resources/glossary_base.txt` 追加无歧义术语，或随任务提供术语表。
 - 新检查：在 `lt_core.check_segment` 中添加，并在 `eval/mutation_test.py` 加入对应注入类型，用未参与调参的段落复验误报。
 - 版本：0.3.0（2026-11-22）。作者：chensuyan407（Claude Code 协助开发）。

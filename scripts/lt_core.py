@@ -888,7 +888,9 @@ def find_terms(text, gl):
 
 
 def load_base_glossary(src_lang, tgt_lang):
-    path = os.path.join(RES, "glossary_base.tsv")
+    path = os.path.join(RES, "glossary_base.txt")  # tab-separated; .txt because Skill resources must be plain text types
+    if not os.path.exists(path):
+        path = os.path.join(RES, "glossary_base.tsv")  # name used up to v0.3.0
     if not os.path.exists(path):
         return []
     ents = load_glossary_file(path, "base")

@@ -1057,7 +1057,7 @@ def main(argv=None):
     p.add_argument("--reserve", type=int, default=120, help="seconds kept for check/finalize at the end of the budget")
     p.add_argument("--batch-units", type=int, default=1300)
     p.add_argument("--started", help="unix time the run started (for the time budget)")
-    p.add_argument("--no-base", action="store_true", help="do not auto-apply resources/glossary_base.tsv")
+    p.add_argument("--no-base", action="store_true", help="do not auto-apply resources/glossary_base.txt")
     p.add_argument("--no-preview", action="store_true")
     p.add_argument("--ignore-case-scope", action="store_true")
     p.add_argument("--keep", action="store_true", help="keep existing translations in --work (re-segmenting the same source)")

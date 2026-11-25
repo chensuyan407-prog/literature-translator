@@ -80,4 +80,4 @@
 - 术语回填、段号唯一、bilingual.md/html、translation.zh.md、alignment.jsonl 均已检查。
 - `literature-translator_arm_v0.3.0.zip`：zip 中每个文件的哈希都与开发目录一致。Skill 共 17 个文件（≤50），最大的是 pdf_layout.py，约 113 KB（≤500 KB），合计约 352 KB（≤2 MB），全部 UTF‑8，没有符号链接。旧包 v0.1.0（e223d643…）、v0.2.0（b5e8bd12…）以及 grading/ 均保留未改。
 - 开源仓库：https://github.com/chensuyan407-prog/literature-translator （MIT；Skill 在根目录，复现与回归脚本在 dev/；不含论文 PDF、转录和整篇译文）。已写入 GITHUB_URL.txt。
-- 平台提交：attempt 99244（Skill 目录 + 本会话原生 trace）。
+- 平台提交：attempt 99244 与此前 v0.2 的 97912 都在预检阶段被拒（未进入沙箱，不扣次数），原因是 `resources/glossary_base.tsv` 不属于平台支持的 Skill 资源类型。已改名为 `resources/glossary_base.txt`（内容不变，仍为制表符分隔；加载器兼容旧名），干净环境复现指标 0 差异。
