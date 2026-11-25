@@ -367,7 +367,7 @@ CONTRACT_HINTS = [
     (r"glossary|term|术语|vocab", "glossary"),
     (r"manual|review|human|人工|待确认", "manual_review"),
     (r"uncertain|不确定|limitation|局限", "uncertainty"),
-    (r"untranslated|未译|missing", "untranslated"),
+    (r"\buntranslated\b|未译", "untranslated"),
     (r"qa|check|verif|issue|核验|检查|quality", "qa"),
     (r"metric|score|指标", "metrics"),
     (r"coverage|complete|完整", "coverage"),
@@ -390,7 +390,9 @@ def _want_type(spec):
         return "object"
     if re.search(r"\bstring\b|\bstr\b|\btext\b|字符串|文本", s):
         return "string"
-    if re.search(r"number|float|\bint|integer|数值|数字", s):
+    if re.search(r"\binteger\b|\bint\b|整数", s):
+        return "integer"
+    if re.search(r"number|float|数值|数字", s):
         return "number"
     if re.search(r"bool", s):
         return "boolean"
@@ -398,26 +400,46 @@ def _want_type(spec):
 
 
 def contract_schema(contract):
-    """Normalize flat contracts, JSON Schema objects (properties/required), and deliverables dicts into {field: spec}."""
+    """Normalize flat contracts, JSON Schema (properties/required), output_fields/fields, and deliverables into {field: spec}."""
+    if isinstance(contract, list):
+        out = {}
+        for item in contract:
+            if isinstance(item, str) and item:
+                out[item] = None
+            elif isinstance(item, dict):
+                nm = item.get("name") or item.get("field") or item.get("key") or item.get("id")
+                if isinstance(nm, str) and nm:
+                    out[nm] = item
+        return out
     if not isinstance(contract, dict):
-        return contract if isinstance(contract, list) else {}
-    src = contract.get("deliverables") if isinstance(contract.get("deliverables"), dict) and len(contract) == 1 else contract
-    if "properties" in src or ("required" in src and isinstance(src.get("required"), list)):
+        return {}
+    if isinstance(contract.get("deliverables"), (dict, list)) and len(contract) == 1:
+        return contract_schema(contract["deliverables"])
+    for k in ("output_contract", "output_fields", "fields", "required_fields", "schema"):
+        if k in contract and len(contract) == 1:
+            return contract_schema(contract[k])
+    if "properties" in contract or ("required" in contract and isinstance(contract.get("required"), list)):
         fields = {}
-        props = src.get("properties")
+        props = contract.get("properties")
         if isinstance(props, dict):
             fields.update(props)
-        req = src.get("required")
+        req = contract.get("required")
         if isinstance(req, list):
             for name in req:
                 if isinstance(name, str) and name not in fields:
                     fields[name] = None
-        if isinstance(src.get("deliverables"), dict):
-            for name, spec in src["deliverables"].items():
-                if isinstance(name, str) and name not in fields:
-                    fields[name] = spec
+        if "deliverables" in contract:
+            for k, v in contract_schema(contract["deliverables"]).items():
+                if k not in fields:
+                    fields[k] = v
         return fields
-    return src
+    if "output_fields" in contract or "fields" in contract:
+        fields = {}
+        for k in ("output_fields", "fields"):
+            if k in contract:
+                fields.update(contract_schema(contract[k]))
+        return fields
+    return contract
 
 
 def coerce(value, want):
@@ -441,6 +463,14 @@ def coerce(value, want):
         if isinstance(value, list) and all(isinstance(x, str) for x in value):
             return "\n".join(value), True
         return json.dumps(value, ensure_ascii=False), True
+    if want == "integer":
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value, False
+        if isinstance(value, float) and value.is_integer():
+            return int(value), True
+        if isinstance(value, str) and re.fullmatch(r"\s*[-+]?\d+\s*", value):
+            return int(value.strip()), True
+        return value, False
     if want == "number":
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return value, False
@@ -497,7 +527,8 @@ def apply_contract_types(contract, res):
             continue
         val, changed = coerce(res[name], want)
         ok = want is None or (want == "list" and isinstance(val, list)) or (want == "object" and isinstance(val, dict)) or \
-            (want == "string" and isinstance(val, str)) or (want == "number" and isinstance(val, (int, float)) and not isinstance(val, bool)) or \
+            (want == "string" and isinstance(val, str)) or (want == "integer" and isinstance(val, int) and not isinstance(val, bool)) or \
+            (want == "number" and isinstance(val, (int, float)) and not isinstance(val, bool)) or \
             (want == "boolean" and isinstance(val, bool))
         if not ok:
             gaps.append({"field": name, "expected": want, "got": res[name] if isinstance(res[name], (str, int, float, bool)) else type(res[name]).__name__,
@@ -595,7 +626,7 @@ def build_result(st, segs, trans, gl, issues, metrics, tstats, dropped, changes,
                               ([f"{metrics['regions_needing_transcription']} scanned region(s) not transcribed"] if metrics["regions_needing_transcription"] else []),
         "resume": {"resumable": bool(untr) or bool(metrics["regions_needing_transcription"]), "untranslated_count": len(untr),
                    "next_ids": [u["id"] for u in untr[:30]], "state_dir": "resume_state/",
-                   "command": "python tr.py --work <output>/resume_state session --budget 900 && python tr.py --work <output>/resume_state batch"},
+                   "command": "python3 tr.py --work <output>/resume_state session --budget 900 && python3 tr.py --work <output>/resume_state batch"},
         "changes": changes[-300:],
         "dropped_non_body": {"count": len(dropped), "file": "dropped.jsonl",
                              "by_role": dict(Counter(d.get("role") for d in dropped))},
@@ -617,6 +648,8 @@ def build_result(st, segs, trans, gl, issues, metrics, tstats, dropped, changes,
         if g["field"] not in res["contract_fields_unfilled"]:
             res["contract_fields_unfilled"].append(g["field"])
     if res["contract_gaps"]:
+        if res["status"] == "success":
+            res["status"] = "partial"
         res["status_reason"] += f"; output_contract not fully satisfied: {', '.join(g['field'] for g in res['contract_gaps'])} (see contract_gaps)"
     return res
 

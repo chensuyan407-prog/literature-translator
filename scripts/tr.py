@@ -74,28 +74,44 @@ class Ctx:
 
 
 # ---------------------------------------------------------------- case discovery
-def _walk_strings(obj):
+CONTRACT_KEYS = ("output_contract", "outputs_contract", "output_schema", "required_outputs", "output_fields", "schema", "deliverables")
+PRIMARY_KEY_RX = re.compile(r"^(source|paper|manuscript|document|article|input_file|primary|main_file|原文|论文|主文件)$", re.I)
+
+
+def discover_contract(case):
+    if not isinstance(case, dict):
+        return None
+    for k in CONTRACT_KEYS:
+        if case.get(k) is not None:
+            return case[k]
+    return None
+
+
+def _walk_strings_keyed(obj, key=""):
     if isinstance(obj, str):
-        yield obj
+        yield key, obj
     elif isinstance(obj, dict):
-        for v in obj.values():
-            yield from _walk_strings(v)
+        for k, v in obj.items():
+            yield from _walk_strings_keyed(v, str(k))
     elif isinstance(obj, list):
         for v in obj:
-            yield from _walk_strings(v)
+            yield from _walk_strings_keyed(v, key)
 
 
 def discover(case_path, explicit_source):
     case = C.read_json(case_path, {}) if case_path and os.path.exists(case_path) else {}
     base = os.path.dirname(os.path.abspath(case_path)) if case_path else os.getcwd()
     roots = [base, "/input", os.path.join(base, "materials"), "/input/materials", os.getcwd()]
-    files = []
-    for s in _walk_strings(case):
+    files, primary_cands = [], []
+    for key, s in _walk_strings_keyed(case):
         if len(s) < 260 and re.search(r"\.(pdf|txt|md|markdown|tex|docx|html?|tsv|csv|xlsx|json)$", s, re.I):
             for r in roots:
                 cand = s if os.path.isabs(s) else os.path.join(r, s)
                 if os.path.isfile(cand):
-                    files.append(os.path.abspath(cand))
+                    ap = os.path.abspath(cand)
+                    files.append(ap)
+                    if PRIMARY_KEY_RX.match(key):
+                        primary_cands.append(ap)
                     break
     if not files:
         for r in (base, os.path.join(base, "materials"), "/input", "/input/materials"):
@@ -105,13 +121,19 @@ def discover(case_path, explicit_source):
                     if os.path.isfile(fp) and fn not in ("case.json", "task.md") and fn.lower().endswith(SRC_EXT + (".tsv", ".csv", ".xlsx")):
                         files.append(os.path.abspath(fp))
     files = list(dict.fromkeys(files))
-    gloss = [f for f in files if GLOSS_HINT.search(os.path.basename(f)) or f.lower().endswith((".tsv", ".csv", ".xlsx"))]
+    primary_cands = list(dict.fromkeys(primary_cands))
+    gloss = [f for f in files if (GLOSS_HINT.search(os.path.basename(f)) or f.lower().endswith((".tsv", ".csv", ".xlsx"))) and f not in primary_cands]
     srcs = [f for f in files if f not in gloss and f.lower().endswith(SRC_EXT)]
     if explicit_source:
         source = os.path.abspath(explicit_source)
     else:
-        pdfs = [f for f in srcs if f.lower().endswith(".pdf")]
-        source = max(pdfs, key=os.path.getsize) if pdfs else (max(srcs, key=os.path.getsize) if srcs else None)
+        p_srcs = [f for f in primary_cands if f in srcs]
+        if p_srcs:
+            p_pdfs = [f for f in p_srcs if f.lower().endswith(".pdf")]
+            source = p_pdfs[0] if p_pdfs else p_srcs[0]
+        else:
+            pdfs = [f for f in srcs if f.lower().endswith(".pdf")]
+            source = max(pdfs, key=os.path.getsize) if pdfs else (max(srcs, key=os.path.getsize) if srcs else None)
     task_text = ""
     for tp in (os.path.join(base, "task.md"), "/input/task.md", os.path.join(os.getcwd(), "task.md")):
         if os.path.exists(tp):
@@ -143,7 +165,7 @@ def guess_scope(case, task_text):
         for k in ("pages", "page_range", "page", "页码", "页"):
             v = obj.get(k)
             if v and not pages:
-                pages = v if isinstance(v, str) else (f"{v[0]}-{v[-1]}" if isinstance(v, list) and v else str(v))
+                pages = v if isinstance(v, str) else (",".join(map(str, v)) if isinstance(v, list) and v else str(v))
         for k in ("sections", "section", "range", "paragraphs", "章节", "范围"):
             v = obj.get(k)
             if v and isinstance(v, (str, list)) and not sections:
@@ -291,15 +313,36 @@ def refresh(ctx, quiet=True, extra=None):
 def cmd_init(a):
     t0 = time.time()
     work = os.path.abspath(a.work)
+    out = os.path.abspath(a.out)
     os.makedirs(work, exist_ok=True)
+    os.makedirs(out, exist_ok=True)
     for fn in ("segments.jsonl", "translations.json", "glossary.json", "changes.jsonl", "dropped.jsonl", "state.json"):
         if os.path.exists(os.path.join(work, fn)) and not a.keep:
             os.remove(os.path.join(work, fn))
+    # Always seed a minimal result.json before any risky file parsing so fatal errors never leave stale/missing outputs
+    C.write_json(os.path.join(out, "result.json"), {"case_id": None, "status": "partial", "status_reason": "initializing",
+                                                     "skill": {"name": "literature-translator", "version": C.VERSION}})
+    try:
+        case_raw = C.read_json(a.case, {}) if a.case and os.path.exists(a.case) else {}
+    except Exception as cex:
+        case_raw = "__ERR__"
+        case_err = str(cex)
+    if case_raw == "__ERR__":
+        st = {"version": C.VERSION, "case_id": None, "contract": None, "out": out, "work": work,
+              "started": t0 if not a.started else float(a.started), "started_iso": C.now_iso(), "budget_s": a.budget,
+              "max_requests": a.max_requests, "req_reserve": a.req_reserve, "n_cmds": 1,
+              "batch_units": a.batch_units, "n_puts": 0, "n_batches": 0, "uncertainty": [], "source": "",
+              "other_sources": [], "src_lang": "en", "tgt_lang": a.target or "zh",
+              "fatal": f"invalid JSON in case file {a.case}: {case_err}"}
+        ctx = Ctx(work)
+        ctx.st = st
+        ctx.segs = []
+        refresh(ctx)
+        print(f"FAILED: {st['fatal']}\nresult.json written with status=failed -> {out}")
+        return 2
     case, source, gloss_files, other_srcs, task_text = discover(a.case, a.source)
-    out = os.path.abspath(a.out)
-    os.makedirs(out, exist_ok=True)
     st = {"version": C.VERSION, "case_id": (case.get("case_id") or case.get("id")) if isinstance(case, dict) else None,
-          "contract": case.get("output_contract") if isinstance(case, dict) else None, "out": out, "work": work,
+          "contract": discover_contract(case), "out": out, "work": work,
           "started": t0 if not a.started else float(a.started), "started_iso": C.now_iso(), "budget_s": a.budget,
           "max_requests": a.max_requests, "req_reserve": a.req_reserve, "n_cmds": 1,
           "batch_units": a.batch_units, "n_puts": 0, "n_batches": 0, "uncertainty": [], "source": source or "",
@@ -327,11 +370,15 @@ def cmd_init(a):
         st["page_count"] = (parsed.get("meta") or {}).get("page_count")
         if parsed.get("status") == "failed":
             st["fatal"] = f"{parsed.get('error')}: {parsed.get('message')}"
+        elif pages and st.get("page_count") and not any(1 <= p <= st["page_count"] for p in pages):
+            st["fatal"] = f"requested pages {compact_pages(pages)} outside document range (1-{st['page_count']})"
         for w in parsed.get("warnings", [])[:20]:
             st["uncertainty"].append(f"parser warning p.{w.get('page', '-')}: {w.get('code')} {w.get('detail', '')}"[:300])
     else:
         segs, dropped, parsed = C.segments_from_text(source)
         st["parser"] = "text/markdown/latex/docx splitter"
+        if pages:
+            st["uncertainty"].append(f"page scope {compact_pages(pages)} was requested on a non-PDF source without page numbers and could not be enforced by page")
     src_text = " ".join(C.strip_ph(s.get("prot", "")) for s in segs if s.get("translate"))[:200000]
     st["src_lang"] = a.source_lang or (C.detect_lang(src_text) if src_text else "en")
     if st["src_lang"] == "und":
@@ -351,7 +398,11 @@ def cmd_init(a):
     # glossaries: case-provided > (agent, later) > base
     case_gl = []
     for g in gloss_files + (a.glossary or []):
-        case_gl += C.load_glossary_file(g, "case")
+        try:
+            case_gl += C.load_glossary_file(g, "case")
+        except Exception as gx:
+            st["uncertainty"].append(f"glossary warning: {gx}")
+            print(f"WARN: {gx}")
     base = C.load_base_glossary(st["src_lang"], st["tgt_lang"]) if not a.no_base else []
     base_c = C.compile_glossary([dict(e) for e in base])
     alltext = "\n".join(s["prot"] for s in segs if s.get("translate") and s.get("in_scope", True))
@@ -498,6 +549,10 @@ def next_batch(ctx, units=None, kinds=None, ids=None, redo=False, plan=True):
         ctx.st["stop_reason"] = (f"request budget: {sch['req_used']} requests used of {sch['max_requests']} "
                                  f"({ctx.st.get('req_reserve', 6)} reserved for check/finalize)")
         return [], 0
+    if sch and sch["time_left"] <= 0:
+        ctx.st["stop_reason"] = (f"budget: {sch['elapsed']:.0f}s used of {sch['budget']}s "
+                                 f"(reserve {sch['reserve']}s kept for check/finalize)")
+        return [], 0
     if sch and sch["rate"]:
         fit = int(sch["rate"] * max(0.0, sch["time_left"]) * 0.85)
         if fit < 40:
@@ -634,6 +689,9 @@ def cmd_put(a):
         s = ctx.segs[ctx.idx[sid]]
         if not s.get("translate"):
             rejected.append(f"{sid}: kept-original segment ({s['kind']}), not translatable")
+            continue
+        if not s.get("in_scope", True):
+            rejected.append(f"{sid}: out-of-scope segment ({s.get('scope_reason', '')})")
             continue
         tgt = C.normalize_placeholders(tgt)
         if s["kind"] != "table":
@@ -1152,7 +1210,26 @@ def main(argv=None):
     except Exception as ex:  # keep outputs honest even on crashes
         import traceback
         traceback.print_exc()
-        print(f"tr.py {a.cmd} crashed: {ex}. result.json (if any) still reflects the last good state; report this in uncertainty.")
+        err_cid = None
+        try:
+            err_cid = (C.read_json(getattr(a, "case", "") or "", {}) or {}).get("case_id")
+        except Exception:
+            pass
+        err_out = getattr(a, "out", None)
+        if not err_out:
+            try:
+                err_out = (C.read_json(os.path.join(a.work, "state.json"), {}) or {}).get("out")
+            except Exception:
+                pass
+        err_out = err_out or default_dir("out")
+        os.makedirs(err_out, exist_ok=True)
+        C.write_json(os.path.join(err_out, "result.json"), {
+            "case_id": err_cid,
+            "status": "failed",
+            "status_reason": f"tr.py {a.cmd} failed: {type(ex).__name__}: {ex}",
+            "skill": {"name": "literature-translator", "version": C.VERSION},
+        })
+        print(f"tr.py {a.cmd} crashed: {ex}. result.json written with status=failed -> {err_out}")
         return 3
 
 

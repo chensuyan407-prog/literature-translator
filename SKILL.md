@@ -3,17 +3,17 @@ name: literature-translator
 description: Translate a scientific paper (PDF incl. scanned pages, Markdown, LaTeX, DOCX, HTML or text; English↔Chinese) into a paragraph-aligned bilingual result whose every segment points back to its page/block (with per-block boxes for paragraphs that cross columns or pages), with an executable term table (locked translations, forbidden variants, whole-document back-fill), protected formulas/citations/URLs, rebuilt display equations and table grids with crop images, a transcription entry for pages without a text layer, a time-budget scheduler with honest partial results and resume, and automatic checks for numbers (incl. 6 billion = 60 亿), units and counted nouns, figure/table/equation/section references in both directions, negation and qualifier scope, omissions and duplicates. Use for 文献翻译 / 论文翻译 / 双语对照 / 术语表 / 译文核验 tasks, whole papers or a page/section range.
 ---
 
-# literature-translator 0.3.1 — 术语锁定、段落对齐、可自检的文献翻译
+# literature-translator 0.3.2 — 术语锁定、段落对齐、可自检的文献翻译
 
 You (the agent) translate; the scripts do everything that must be exact and repeatable: reading order,
 formula/citation protection, table grids, equation rebuilding, the term table, checks, time budget and
 deliverables. **Never write translations into result.json by hand — always `tr.py put`. Outputs are
 regenerated after every put, so a valid partial result exists at all times.**
 
-Locate the Python interpreter and skill root cleanly first (supports containers with `python3` only or alternate mount paths):
+Locate the Python interpreter and skill root cleanly first (supports containers with `python3` only or alternate/nested mount paths; re-run this resolver if a new shell starts):
 ```bash
 PY=$(command -v python3 || command -v python)
-for d in /skills/weekly-skill /app/submission /app/skills "${SKILL_DIR:-}" "$(pwd)"; do
+for d in /skills/weekly-skill /app/submission /app/skills /app/skills/* "${SKILL_DIR:-}" "$(pwd)"; do
   [ -f "$d/scripts/tr.py" ] && T="$d/scripts/tr.py" && break
 done
 ```
@@ -65,7 +65,7 @@ resume command are written to result.json; never pretend unfinished parts were t
    ```
    Locators: `@@ S0101..S0103` (region ids), `@@ p6 [x0,y0,x1,y1] #label` (a box; the text keeps that box as its own
    location, also when it lies inside a coarser region), `@@ p6` (whole page). `REST:`/`DONE` closes what is left of
-   the page. Run `python $T transcribe FILE` (`--by ocr|human|agent_vision`). Transcribe exactly as printed; blank
+   the page. Run `"$PY" "$T" transcribe FILE` (`--by ocr|human|agent_vision`). Transcribe exactly as printed; blank
    line between paragraphs; `# ` for headings; `[table]`/`[equation]`/`[footnote]` on the first line forces a kind;
    write `⟪?⟫` for any digit or word you cannot read — never guess. Transcribed parts become ordinary segments for
    batch/put; in `put` you may address them as `@@ #glue`. Without numpy the layout pass is skipped: every scanned
@@ -92,14 +92,14 @@ resume command are written to result.json; never pretend unfinished parts were t
    negation and limiter in its own sentence (not/only/at least/may/approximately; 只有……才); no merging, splitting,
    skipping or repeating; tables keep rows and ` | ` cells; mixed-language segments: translate the foreign
    sentences, keep the rest; unclear phrase → translate and append `⟪?⟫`. Academic register, no additions.
-   Save (`cat > /app/work/b01.txt <<'EOF' … EOF`) and run `python $T put /app/work/b01.txt --next`.
+   Save (`cat > /app/work/b01.txt <<'EOF' … EOF`) and run `"$PY" "$T" put /app/work/b01.txt --next`.
 6. **Fix.** Re-`put` corrected blocks for every `[error]` (old versions stay in `changes.jsonl`).
    `show S0012` = source, placeholders, translation, issues; `check` (errors) / `issues` (all).
    Warnings (negation_count/scope, qualifier_check, quantifier_added, polarity_check, subject_binding,
    counted_noun_changed, unit_missing, length_ratio …) are hints: fix real problems, leave the rest for
    `manual_review.md`. Errors include table_cell_mismatch (a number moved to another row/column), unit_changed
    (10 MB ≠ 10 兆比特), term_violation (a forbidden variant, even next to the locked term).
-7. **Finalize**: `python $T finalize`. Contract fields are mapped by name and **coerced to the declared type**
+7. **Finalize**: `"$PY" "$T" finalize`. Contract fields are mapped by name and **coerced to the declared type**
    (e.g. `verification_notes: list` → a list; coercions listed in `contract_type_coercions`). Fields it cannot
    map are printed: set them with `--set NAME=value` / `--set-json NAME=file.json` (answers to questions, citing
    segment ids such as `S0015 (p.2)`). A value that cannot be given the declared type (e.g. `confidence_level:
@@ -128,7 +128,7 @@ Segment statuses: `translated`, `untranslated`, `kept_original` (references, dis
 numeric tables, text already in the target language, NONTEXT regions — with reason), `needs_transcription`,
 `unreadable`, `out_of_scope`.
 
-**Continue later**: `python $T --work /app/output/resume_state session --budget 900` then `batch` as usual. The
+**Continue later**: `"$PY" "$T" --work /app/output/resume_state session --budget 900` then `batch` as usual. The
 resume state carries translations with their revisions and the full `changes.jsonl`; nothing is re-translated.
 
 ## Exceptions
@@ -142,5 +142,5 @@ resume state carries translations with their revisions and the full `changes.jso
 
 ## Verifying a translation from elsewhere
 
-`python $T audit other.md` scores any translation of the same source document-wide (numbers, citations,
+`"$PY" "$T" audit other.md` scores any translation of the same source document-wide (numbers, citations,
 cross-references, locked terms). `eval/mutation_test.py` injects known errors and reports what the checks catch.

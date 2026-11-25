@@ -12,7 +12,7 @@ import time
 import zipfile
 from collections import Counter, defaultdict
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 TAG_OPEN, TAG_CLOSE = "\ue000", "\ue001"
 PH_RE = re.compile(r"\{\{([MCU]\d+)\}\}")
 PH_LOOSE_RE = re.compile(r"[\{｛]\s*[\{｛]\s*([MCUmcu]\s*\d+)\s*[\}｝]\s*[\}｝]")
@@ -417,15 +417,23 @@ def segments_from_pdf(path, workdir, password=None, pages=None, ocr="auto"):
                                 "reason": "grid detected inside a diagram (no table caption, mostly empty cells); not a data table"})
                 continue
             rows = [[norm_ws(c or "") for c in row] for row in t["rows"]]
-            head, body = (rows[:2], rows[2:]) if len(rows) > 25 else (rows, [])
-            raw = "\n".join(" | ".join(r_) for r_ in head)
-            prot_lines, ph_all, disp_lines = [], {}, []
-            alpha = len(re.findall(r"[A-Za-z\u4e00-\u9fff]{2,}", raw))
-            seg = {"kind": "table", "src": raw, "prot": raw, "ph": {}, "table_id": t.get("id"), "table_caption": t.get("caption"),
-                   "table_body_kept": [" | ".join(r_) for r_ in body], "n_rows": len(head),
-                   "translate": alpha >= 2, "reason": None if alpha >= 2 else "numeric table: kept as in source", **loc,
-                   "bbox": t["bbox"], "boxes": [[t["page"], t["bbox"]]], "flags": flags}
-            segs.append(seg)
+            body_rows = rows[2:] if len(rows) > 25 else []
+            prose_cells = sum(1 for r_ in body_rows for c in r_ if len(re.findall(r"[A-Za-z\u4e00-\u9fff]{4,}", c)) >= 2)
+            if len(rows) > 25 and prose_cells >= max(6, len(body_rows) * 0.35):
+                chunks = [(rows[:22], [])] + [(rows[k:k + 20], []) for k in range(22, len(rows), 20)]
+            elif len(rows) > 25:
+                chunks = [(rows[:2], body_rows)]
+            else:
+                chunks = [(rows, [])]
+            for ci, (chunk, kept_body) in enumerate(chunks):
+                raw = "\n".join(" | ".join(r_) for r_ in chunk)
+                alpha = len(re.findall(r"[A-Za-z\u4e00-\u9fff]{2,}", raw))
+                seg = {"kind": "table", "src": raw, "prot": raw, "ph": {}, "table_id": t.get("id"), "table_caption": t.get("caption"),
+                       "table_body_kept": [" | ".join(r_) for r_ in kept_body], "n_rows": len(chunk),
+                       **({"table_part": f"{ci + 1}/{len(chunks)}"} if len(chunks) > 1 else {}),
+                       "translate": alpha >= 2, "reason": None if alpha >= 2 else "numeric table: kept as in source", **loc,
+                       "bbox": t["bbox"], "boxes": [[t["page"], t["bbox"]]], "flags": flags}
+                segs.append(seg)
             between_roles.append("table")
             continue
         if role == "reference":
@@ -541,6 +549,25 @@ def segments_from_pdf(path, workdir, password=None, pages=None, ocr="auto"):
                                   + (" — whole-page region because " + rg["degraded"] if rg.get("degraded") else "")})
         at = next((i for i, s in enumerate(segs) if (s.get("page") or 0) > p), len(segs))
         segs[at:at] = new
+    # embedded raster figures on sparse-text mixed pages: expose as image_region so scientific facts inside images cannot be silently skipped
+    unres = set(r.get("unresolved_pages") or [])
+    for fg in r.get("figures") or []:
+        if fg.get("kind") != "raster":
+            continue
+        p = fg.get("page")
+        if p in unres:
+            continue
+        info = page_info.get(p, {})
+        W, H = max(1.0, info.get("width", 1.0)), max(1.0, info.get("height", 1.0))
+        bb = [round(float(v), 1) for v in (fg.get("bbox") or [0, 0, 0, 0])]
+        f_area = max(0.0, (bb[2] - bb[0]) * (bb[3] - bb[1]))
+        if f_area > 0.05 * W * H and info.get("text_layer_chars", 0) < 800:
+            reg = {"kind": "image_region", "src": "", "prot": "", "ph": {}, "translate": True, "needs_transcription": True,
+                   "page": p, "pages": [p], "bbox": bb, "boxes": [[p, bb]], "column": None,
+                   "blocks": [f"p{p}-fig"], "section": "", "flags": ["mixed_page_figure"], "granularity": "region",
+                   "reason": "embedded raster figure on mixed text+image page: inspect crops/<id>.png and transcribe via tr.py transcribe, or mark NONTEXT"}
+            at = next((i for i, s in enumerate(segs) if (s.get("page") or 0) > p), len(segs))
+            segs.insert(at, reg)
     return segs, dropped, r
 
 
@@ -706,8 +733,51 @@ def foreign_sentences(text, tgt_lang):
     return [c for c in re.findall(r"[一-鿿][^。！？]{6,}[。！？]", t) if han_count(c) >= 6]
 
 
+def _split_oversized_paragraphs(segs, max_units=900):
+    """Split huge single paragraphs at sentence boundaries so batch 1 never exceeds token/time budgets."""
+    out = []
+    for s in segs:
+        if s.get("kind") != "paragraph" or not s.get("translate"):
+            out.append(s)
+            continue
+        lang = detect_lang(strip_ph(s.get("prot", "")))
+        lang = lang if lang != "und" else "en"
+        if size_units(s.get("prot", ""), lang) <= max_units:
+            out.append(s)
+            continue
+        sents = split_sentences(s.get("prot", ""), lang)
+        if len(sents) <= 1:
+            # hard word/char split as last resort when a massive blob has no sentence punctuation
+            words = s.get("prot", "").split(" ")
+            step = max(200, max_units // 2)
+            sents = [" ".join(words[k:k + step]) for k in range(0, len(words), step)]
+        chunks, cur = [], []
+        for sent in sents:
+            cand = " ".join(cur + [sent]) if cur else sent
+            if cur and size_units(cand, lang) > max_units:
+                chunks.append(" ".join(cur))
+                cur = [sent]
+            else:
+                cur.append(sent)
+        if cur:
+            chunks.append(" ".join(cur))
+        ph_all = s.get("ph") or {}
+        for ci, ch in enumerate(chunks):
+            ch_ph = {k: v for k, v in ph_all.items() if "{{" + k + "}}" in ch}
+            sub = dict(s)
+            sub["prot"] = ch
+            sub["ph"] = ch_ph
+            sub["src"] = restore(ch, ch_ph)
+            sub["flags"] = list(s.get("flags", [])) + (["split_oversized_paragraph"] if len(chunks) > 1 else [])
+            if len(chunks) > 1:
+                sub["split_part"] = f"{ci + 1}/{len(chunks)}"
+            out.append(sub)
+    return out
+
+
 def finish_segments(segs, tgt_lang):
     """Assign stable ids, language, sentences, size; mark segments already in the target language."""
+    segs = _split_oversized_paragraphs(segs)
     out = []
     for i, s in enumerate(segs, 1):
         s["id"] = f"S{i:04d}"
@@ -833,8 +903,8 @@ def load_glossary_file(path, origin):
                 if len(cells) >= 2:
                     lines.append("\t".join(cells))
             return parse_glossary_lines(lines, origin)
-        except Exception:
-            return []
+        except Exception as ex:
+            raise ValueError(f"failed to read xlsx glossary {path}: {ex}") from ex
     with open(path, encoding="utf-8", errors="replace") as fh:
         text = fh.read()
     lines = text.splitlines()
@@ -1129,6 +1199,10 @@ POLARITY = [  # English direction word -> acceptable Chinese renderings (warn on
     (r"\b(negative\w*)\b", r"负|消极|阴|否定"),
     (r"\b(overweight\w*|overestimat\w*)\b", r"过高|过重|过大|过度|高估"),
     (r"\b(underweight\w*|underestimat\w*)\b", r"过低|过轻|过小|不足|低估"),
+    (r"\b(improv(?:e|ed|es|ing|ement)|gain(?:s|ed)?)\b", r"改善|改进|提高|提升|增进|优于|增益|进步"),
+    (r"\b(worsen\w*|deteriorat\w*|declin(?:e|ed|es|ing))\b", r"恶化|下降|降低|退化|减弱|下滑"),
+    (r"\b(mortality|death(?:s)?|fatality)\b", r"死亡|病死|致死"),
+    (r"\b(hospitali[sz]ation\w*)\b", r"住院"),
 ]
 UNIV_ZH = re.compile(r"普遍|一律|总是|始终|全部|所有|任何|一切")  # 无论 renders "whether ... or" too: not a quantifier
 UNIV_EN = re.compile(r"\b(all|every\w*|always|each|any\w*|universal\w*|general\w*|whole|entire\w*|both|whenever|regardless|throughout|"
@@ -1550,7 +1624,9 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
         for e in gl:
             if e["source"] in hits:
                 tg = e["target"]
-                ok = (tg.lower() in tgt.lower()) if e["keep_original"] or re.search(r"[A-Za-z]", tg) and not han_count(tg) else (tg in tgt)
+                ci_mode = e["keep_original"] or (bool(re.search(r"[A-Za-z]", tg)) and not han_count(tg))
+                occ_tgt = len(re.findall(re.escape(tg), tgt, re.I if ci_mode else 0)) if tg else 0
+                ok = occ_tgt > 0
                 sev = "warn" if e["origin"] == "base" else "error"
                 masked = tgt.replace(tg, "\0" * len(tg)) if tg else tgt
                 bad = [v for v in e.get("variants", []) if v and v not in tg and v in masked]
@@ -1559,6 +1635,8 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
                 elif bad:
                     add("term_violation", sev, f"forbidden rendering '{bad[0]}' of '{e['source']}' used (x{masked.count(bad[0])}) next to the locked '{tg}'; "
                                                f"the source has the term {hits[e['source']]}x")
+                elif hits[e["source"]] >= 2 and occ_tgt < hits[e["source"]] and e["origin"] != "base":
+                    add("term_count_mismatch", "warn", f"term '{e['source']}' appears {hits[e['source']]}x in source, locked '{tg}' only {occ_tgt}x in translation")
     # 9. tables keep their grid
     if seg["kind"] == "table":
         sr = [r for r in src.split("\n") if r.strip()]
@@ -1589,6 +1667,8 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
         ts = len(split_sentences(t_plain, "zh"))
         if ss >= 3 and ts and (ts < ss * 0.5 or ts > ss * 2.0):
             add("sentence_count", "warn", f"{ss} source sentences vs {ts} translated sentences; check for merged/omitted sentences")
+        if h == 0 and len(latin_words(t_plain)) >= 6:
+            add("wrong_target_language", "error", "translation contains no Chinese text (English supplied where Chinese was required)")
     elif src_lang == "zh" and prose:
         h = han_count(s_plain)
         w = len(latin_words(t_plain))
@@ -1596,6 +1676,8 @@ def check_segment(seg, tgt, gl, src_lang, tgt_lang):
             add("length_ratio", "warn", f"{w} English words for {h} Chinese chars (ratio {w / h:.2f}); possible omission or addition")
         if han_count(t_plain) > 3:
             add("untranslated_residue", "warn", f"{han_count(t_plain)} Chinese characters left in translation")
+        if w < 3 and han_count(t_plain) >= 6:
+            add("wrong_target_language", "error", "translation contains almost no English text (Chinese supplied where English was required)")
     return issues
 
 
@@ -1616,7 +1698,9 @@ def term_stats(segs, trans, gl):
                 st = stats[e["source"]]
                 st["segments_with_term"] += 1
                 tg = e["target"]
-                ok = (tg.lower() in t.lower()) if (e["keep_original"] or not han_count(tg)) else (tg in t)
+                ci_mode = e["keep_original"] or not han_count(tg)
+                occ_tgt = len(re.findall(re.escape(tg), t, re.I if ci_mode else 0)) if tg else 0
+                ok = (occ_tgt >= hits[e["source"]]) if e["origin"] != "base" else (occ_tgt > 0)
                 if ok:
                     st["segments_consistent"] += 1
                 else:
